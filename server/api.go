@@ -64,7 +64,7 @@ func init() {
 type APIErrorMessage struct {
 	HTTPStatus int    `json:"code"`
 	Message    string `json:"type"`
-	Error      error  `json:error`
+	Error      error  `json:"error"`
 }
 
 // NewSingleFinalPathHostReverseProxy proxies QueryString of the request url to the target url
