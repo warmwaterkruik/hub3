@@ -26,6 +26,7 @@ import (
 	"github.com/delving/rapid-saas/hub3/fragments"
 	"github.com/delving/rapid-saas/hub3/index"
 	w "github.com/gammazero/workerpool"
+	"github.com/pkg/errors"
 
 	elastic "github.com/olivere/elastic"
 )
@@ -234,7 +235,8 @@ func NewDataSetHistogram() ([]*elastic.AggregationBucketHistogramItem, error) {
 }
 
 // indexRecordRevisionsBySpec counts all the records stored in the Index for a Dataset
-func (ds DataSet) indexRecordRevisionsBySpec(ctx context.Context) (int, []DataSetRevisions, []DataSetCounter, []DataSetCounter, error) {
+func (ds DataSet) indexRecordRevisionsBySpec(
+	ctx context.Context) (int, []DataSetRevisions, []DataSetCounter, []DataSetCounter, error) {
 	revisions := []DataSetRevisions{}
 	counter := []DataSetCounter{}
 	tagCounter := []DataSetCounter{}
@@ -267,18 +269,15 @@ func (ds DataSet) indexRecordRevisionsBySpec(ctx context.Context) (int, []DataSe
 		Aggregation("contentTags", contentTagAgg).
 		Do(ctx)
 	if err != nil {
-		logger.WithField("spec", ds.Spec).Errorf("Unable to get IndexRevisionStats for the dataset.")
 		return 0, revisions, counter, tagCounter, err
 	}
 	fmt.Printf("total hits: %d\n", res.Hits.TotalHits)
 	if res == nil {
-		logger.Errorf("expected response != nil; got: %v", res)
 		return 0, revisions, counter, tagCounter, fmt.Errorf("expected response != nil")
 	}
 	aggs := res.Aggregations
 	revAggCount, found := aggs.Terms("revisions")
 	if !found {
-		logger.Errorf("Expected to find revision aggregations but got: %v", res)
 		return 0, revisions, counter, tagCounter, fmt.Errorf("expected revision aggregrations")
 	}
 	for _, keyCount := range revAggCount.Buckets {
@@ -289,7 +288,6 @@ func (ds DataSet) indexRecordRevisionsBySpec(ctx context.Context) (int, []DataSe
 	}
 	counter, err = createDataSetCounters(aggs, "tags")
 	if err != nil {
-		logger.Errorf("Unable to get Tag ggregations but got: %v", res)
 		return 0, revisions, counter, tagCounter, fmt.Errorf("expected tag aggregrations")
 	}
 
@@ -313,7 +311,6 @@ func createDataSetCounters(aggs elastic.Aggregations, name string) ([]DataSetCou
 	counters := []DataSetCounter{}
 	aggCount, found := aggs.Terms(name)
 	if !found {
-		logger.Errorf("Expected to find %s aggregations but got: %v", name, aggs)
 		return counters, fmt.Errorf("expected %s aggregrations", name)
 	}
 	for _, keyCount := range aggCount.Buckets {
@@ -355,18 +352,15 @@ func (ds DataSet) createLodFragmentStats(ctx context.Context) (LODFragmentStats,
 		Aggregation("tags", tagsAgg).
 		Do(ctx)
 	if err != nil {
-		logger.WithField("spec", ds.Spec).Errorf("Unable to get FragmentStatsBySpec for the dataset.")
 		return fStats, err
 	}
 	fmt.Printf("total hits: %d\n", res.Hits.TotalHits)
 	if res == nil {
-		logger.Errorf("expected response != nil; got: %v", res)
 		return fStats, fmt.Errorf("expected response != nil")
 	}
 	aggs := res.Aggregations
 	revAggCount, found := aggs.Terms("revisions")
 	if !found {
-		logger.Errorf("Expected to find revision aggregations but got: %v", res)
 		return fStats, fmt.Errorf("expected revision aggregrations")
 	}
 	for _, keyCount := range revAggCount.Buckets {
@@ -565,7 +559,6 @@ func (ds DataSet) deleteIndexOrphans(ctx context.Context, wp *w.WorkerPool) (int
 		if ds.validForPostHook() && wp != nil {
 			err := CreateDeletePostHooks(ctx, q, wp)
 			if err != nil {
-				logger.Errorf("unable to create delete posthooks: %#v", err)
 				//return 0, err
 			}
 		}
@@ -576,16 +569,13 @@ func (ds DataSet) deleteIndexOrphans(ctx context.Context, wp *w.WorkerPool) (int
 			Conflicts("proceed"). // default is abort
 			Do(ctx)
 		if err != nil {
-			logger.WithField("spec", ds.Spec).Errorf("Unable to delete orphaned dataset records from index: %s.", err)
 			return
 			//return err
 		}
 		if res == nil {
-			logger.Errorf("expected response != nil; got: %v", res)
 			//return fmt.Errorf("expected response != nil")
 			return
 		}
-		logger.Infof("Removed %d records for spec %s with older revision than %d", res.Deleted, ds.Spec, ds.Revision)
 
 	}()
 	return 0, nil
@@ -594,12 +584,10 @@ func (ds DataSet) deleteIndexOrphans(ctx context.Context, wp *w.WorkerPool) (int
 // DeleteAllIndexRecords deletes all the records from the Search Index linked to this dataset
 func (ds DataSet) deleteAllIndexRecords(ctx context.Context, wp *w.WorkerPool) (int, error) {
 	q := elastic.NewTermQuery(c.Config.ElasticSearch.SpecKey, ds.Spec)
-	logger.Infof("%#v", q)
 	if ds.validForPostHook() {
 		err := CreateDeletePostHooks(ctx, q, wp)
 		if err != nil {
-			logger.Errorf("unable to create delete posthooks: %#v", err)
-			return 0, err
+			return 0, errors.Wrap(err, "unable to create delete posthooks")
 		}
 	}
 	res, err := index.ESClient().DeleteByQuery().
@@ -607,14 +595,11 @@ func (ds DataSet) deleteAllIndexRecords(ctx context.Context, wp *w.WorkerPool) (
 		Query(q).
 		Do(ctx)
 	if err != nil {
-		logger.WithField("spec", ds.Spec).Errorf("Unable to delete dataset records from index.")
 		return 0, err
 	}
 	if res == nil {
-		logger.Errorf("expected response != nil; got: %v", res)
 		return 0, fmt.Errorf("expected response != nil")
 	}
-	logger.Infof("Removed %d records for spec %s", res.Deleted, ds.Spec)
 	return int(res.Deleted), err
 }
 
@@ -651,7 +636,6 @@ func (ds DataSet) DropRecords(ctx context.Context, wp *w.WorkerPool) (bool, erro
 	if c.Config.RDF.RDFStoreEnabled {
 		ok, err = ds.deleteAllGraphs()
 		if !ok || err != nil {
-			logger.Errorf("Unable to drop all graphs for %s", ds.Spec)
 			return ok, err
 		}
 	}
@@ -659,7 +643,6 @@ func (ds DataSet) DropRecords(ctx context.Context, wp *w.WorkerPool) (bool, erro
 	if c.Config.ElasticSearch.Enabled {
 		_, err = ds.deleteAllIndexRecords(ctx, wp)
 		if err != nil {
-			logger.Errorf("Unable to drop all index records for %s: %#v", ds.Spec, err)
 			return false, err
 		}
 	}
@@ -670,12 +653,10 @@ func (ds DataSet) DropRecords(ctx context.Context, wp *w.WorkerPool) (bool, erro
 func (ds DataSet) DropAll(ctx context.Context, wp *w.WorkerPool) (bool, error) {
 	ok, err := ds.DropRecords(ctx, wp)
 	if !ok || err != nil {
-		logger.Errorf("Unable to drop all records for spec %s: %#v", ds.Spec, err)
 		return ok, err
 	}
 	err = orm.DeleteStruct(&ds)
 	if err != nil {
-		logger.Errorf("Unable to delete dataset %s from storage", ds.Spec)
 		return false, err
 	}
 	return ok, err

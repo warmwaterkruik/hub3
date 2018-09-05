@@ -27,7 +27,7 @@ import (
 	"github.com/knakk/rdf"
 	"github.com/knakk/sparql"
 	"github.com/parnurzeal/gorequest"
-	"github.com/sirupsen/logrus"
+	"github.com/pkg/errors"
 )
 
 const queries = `
@@ -131,7 +131,7 @@ func buildRepo(endPoint string) *sparql.Repo {
 		sparql.Timeout(time.Millisecond*1500),
 	)
 	if err != nil {
-		logger.Fatal(err)
+		log.Fatal(err)
 	}
 	return repo
 }
@@ -166,14 +166,11 @@ func UpdateViaSparql(update string) []error {
 func DeleteAllGraphsBySpec(spec string) (bool, error) {
 	query, err := queryBank.Prepare("deleteAllGraphsBySpec", struct{ Spec string }{spec})
 	if err != nil {
-		logger.WithField("spec", spec).Errorf("Unable to build deleteAllGraphsBySpec query: %s", err)
-		return false, err
+		return false, errors.Wrap(err, "Unable to build deleteAllGraphsBySpec query")
 	}
-	logger.Info(query)
 	errs := UpdateViaSparql(query)
 	if errs != nil {
-		logger.WithField("query", query).Errorf("Unable query endpoint: %s", errs)
-		return false, errs[0]
+		return false, errors.Wrap(errs[0], "Unable to query endpoint")
 	}
 	return true, nil
 }
@@ -186,14 +183,11 @@ func DeleteGraphsOrphansBySpec(spec string, revision int) (bool, error) {
 		RevisionNumber int
 	}{spec, revision})
 	if err != nil {
-		logger.WithField("spec", spec).Errorf("Unable to build deleteOrphanGraphsBySpec query: %s", err)
-		return false, err
+		return false, errors.Wrap(err, "Unable to build deleteOrphanGraphsBySpec query")
 	}
-	logger.Info(query)
 	errs := UpdateViaSparql(query)
 	if errs != nil {
-		logger.WithField("query", query).Errorf("Unable query endpoint: %s", errs)
-		return false, errs[0]
+		return false, errors.Wrap(errs[0], "Unable to query endpoint")
 	}
 	return true, nil
 }
@@ -203,20 +197,17 @@ func CountRevisionsBySpec(spec string) ([]DataSetRevisions, error) {
 	query, err := queryBank.Prepare("countRevisionsBySpec", struct{ Spec string }{spec})
 	revisions := []DataSetRevisions{}
 	if err != nil {
-		logger.WithField("spec", spec).Errorf("Unable to build countRevisionsBySpec query: %s", err)
-		return revisions, err
+		return revisions, errors.Wrap(err, "Unable to build countRevisionsBySpec query")
 	}
 	//fmt.Printf("%#v", query)
 	res, err := SparqlRepo.Query(query)
 	if err != nil {
-		logger.WithField("query", query).Errorf("Unable query endpoint: %s", err)
-		return revisions, err
+		return revisions, errors.Wrap(err, "Unable to query endpoint")
 	}
 	//fmt.Printf("%#v", res.Solutions())
 	for _, v := range res.Solutions() {
 		revisionTerm, ok := v["revision"]
 		if !ok {
-			logger.Infof("No revisions found for spec %s", spec)
 			return revisions, nil
 		}
 		revision, err := strconv.Atoi(revisionTerm.String())
@@ -239,17 +230,14 @@ func CountRevisionsBySpec(spec string) ([]DataSetRevisions, error) {
 func CountGraphsBySpec(spec string) (int, error) {
 	query, err := queryBank.Prepare("countGraphPerSpec", struct{ Spec string }{spec})
 	if err != nil {
-		logger.WithField("spec", spec).Errorf("Unable to build CountGraphsBySpec query: %s", err)
-		return 0, err
+		return 0, errors.Wrap(err, "unable to build CountGraphsBySpec query")
 	}
 	res, err := SparqlRepo.Query(query)
 	if err != nil {
-		logger.WithField("query", query).Errorf("Unable query endpoint: %s", err)
-		return 0, err
+		return 0, errors.Wrap(err, "unable to query endpoint")
 	}
 	countStr, ok := res.Bindings()["count"]
 	if !ok {
-		logger.WithField("bindings", res.Bindings()).Errorf("Unable to get count from results")
 		return 0, fmt.Errorf("Unable to get count from result bindings: %#v", res.Bindings())
 	}
 	var count int
@@ -264,23 +252,20 @@ func CountGraphsBySpec(spec string) (int, error) {
 func PrepareAsk(uri string) (string, error) {
 	q, err := queryBank.Prepare("ask_subject", struct{ URI string }{uri})
 	if err != nil {
-		fields := logrus.Fields{"err": err, "uri": uri}
-		logger.WithFields(fields).Error("Unable to build ask query")
-		return "", err
+		return "", errors.Wrap(err, "unable to build ask query")
 	}
 	return q, err
 }
 
 // AskSPARQL performs a SPARQL ASK query
 func AskSPARQL(query string) (bool, error) {
-	res, err := SparqlRepo.Query(query)
+	_, err := SparqlRepo.Query(query)
 	if err != nil {
-		logger.WithField("sparql", "ask").Fatal(err)
-		return false, err
+		return false, errors.Wrap(err, "unable to execute ask query")
 	}
-	bindings := res.Results.Bindings
-	logger.Debug(bindings)
-	fmt.Println(bindings)
+	// TODO extract ask information
+	//bindings := res.Results.Bindings
+
 	return false, nil
 }
 
@@ -288,13 +273,11 @@ func AskSPARQL(query string) (bool, error) {
 func DescribeSPARQL(uri string) (map[string][]rdf.Term, error) {
 	query, err := queryBank.Prepare("describe", struct{ URI string }{uri})
 	if err != nil {
-		logger.WithField("uri", uri).Errorf("Unable to build describe query.")
-		return nil, err
+		return nil, errors.Wrap(err, "unable to build describe query")
 	}
 	res, err := SparqlRepo.Query(query)
 	if err != nil {
-		logger.WithField("query", query).Errorf("Unable query endpoint: %s", err)
-		return nil, err
+		return nil, errors.Wrap(err, "unable to execute query")
 	}
 	return res.Bindings(), nil
 }

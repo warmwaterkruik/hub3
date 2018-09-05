@@ -143,23 +143,6 @@ func Start(buildInfo *c.BuildVersionInfo) {
 		return
 	})
 
-	// gaf ZVT
-	//r.Get("/gaf/search-alt/*", func(w http.ResponseWriter, r *http.Request) {
-	//http.ServeFile(w, r, "./public/gaf/index.html")
-	//return
-	//})
-	//r.Get("/gaf/search-alt", func(w http.ResponseWriter, r *http.Request) {
-	//http.ServeFile(w, r, "./public/gaf/index.html")
-	//return
-	//})
-	//r.Get("/gaf/search-cache/*", func(w http.ResponseWriter, r *http.Request) {
-	//http.ServeFile(w, r, "./public/gaf/index-cache.html")
-	//return
-	//})
-	//r.Get("/gaf/search-cache", func(w http.ResponseWriter, r *http.Request) {
-	//http.ServeFile(w, r, "./public/gaf/index-cache.html")
-	//return
-	//})
 
 	// WebResource & imageproxy configuration
 	proxyPrefix := fmt.Sprintf("/%s/*", c.Config.ImageProxy.ProxyPrefix)

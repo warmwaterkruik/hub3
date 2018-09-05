@@ -74,7 +74,7 @@ func renderListSets(r *oai.Request) interface{} {
 	sets := []oai.Set{}
 	datasets, err := models.ListDataSets()
 	if err != nil {
-		logger.Errorln("Unable to retrieve datasets from the storage layer.")
+		// todo add error return
 		return sets
 	}
 	for _, ds := range datasets {

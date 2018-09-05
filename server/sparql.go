@@ -10,7 +10,6 @@ import (
 	c "github.com/delving/rapid-saas/config"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/render"
-	"github.com/labstack/gommon/log"
 )
 
 // SparqlResource is a struct for the Search routes

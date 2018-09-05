@@ -92,7 +92,8 @@ func executeTemplate(tmplString string, name string, model interface{}) string {
 func (su SparqlUpdate) String() string {
 	t := `GRAPH <{{.NamedGraphURI}}> {
 		<{{.NamedGraphURI}}> <http://schemas.delving.eu/nave/terms/datasetSpec> "{{.Spec}}" .
-		<{{.NamedGraphURI}}> <http://schemas.delving.eu/nave/terms/specRevision> "{{.SpecRevision}}"^^<http://www.w3.org/2001/XMLSchema#integer> .
+		<{{.NamedGraphURI}}> <http://schemas.delving.eu/nave/terms/specRevision>
+			"{{.SpecRevision}}"^^<http://www.w3.org/2001/XMLSchema#integer> .
 		{{ .Triples }}
 	}`
 	return executeTemplate(t, "update", su)
@@ -111,7 +112,11 @@ type BulkActionResponse struct {
 }
 
 // ReadActions reads BulkActions from an io.Reader line by line.
-func ReadActions(ctx context.Context, r io.Reader, p *elastic.BulkProcessor, wp *workerpool.WorkerPool) (BulkActionResponse, error) {
+func ReadActions(
+	ctx context.Context,
+	r io.Reader,
+	p *elastic.BulkProcessor,
+	wp *workerpool.WorkerPool) (BulkActionResponse, error) {
 	//log.Println("Start reading actions.")
 	scanner := bufio.NewScanner(r)
 	buf := make([]byte, 0, 64*1024)
@@ -362,7 +367,10 @@ func (action *BulkAction) ESSave(response *BulkActionResponse, v1StylingIndexing
 	action.p.Add(r)
 
 	if c.Config.RDF.RDFStoreEnabled {
-		action.CreateRDFBulkRequest(response, fb.Graph)
+		err := action.CreateRDFBulkRequest(response, fb.Graph)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -398,9 +406,11 @@ type fusekiStoreResponse struct {
 }
 
 //CreateRDFBulkRequest gathers all the triples from an BulkAction to be inserted in bulk.
-func (action BulkAction) CreateRDFBulkRequest(response *BulkActionResponse, g *r.Graph) {
+func (action BulkAction) CreateRDFBulkRequest(response *BulkActionResponse, g *r.Graph) error {
 	var b bytes.Buffer
-	g.Serialize(&b, "text/turtle")
+	if err := g.Serialize(&b, "text/turtle"); err != nil {
+		return err
+	}
 
 	su := SparqlUpdate{
 		Triples:       b.String(),
@@ -409,6 +419,8 @@ func (action BulkAction) CreateRDFBulkRequest(response *BulkActionResponse, g *r
 		SpecRevision:  response.SpecRevision,
 	}
 	response.SparqlUpdates = append(response.SparqlUpdates, su)
+
+	return nil
 }
 
 //RDFSave save the RDFrecord to the TripleStore.
