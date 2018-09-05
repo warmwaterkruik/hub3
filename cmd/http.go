@@ -15,6 +15,8 @@
 package cmd
 
 import (
+	"log"
+
 	"github.com/delving/rapid-saas/server"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -33,17 +35,12 @@ You can find an overview of available endpoints on https://localhost:443/endpoin
 }
 
 func init() {
-	RootCmd.AddCommand(httpCmd)
+	rootCmd.AddCommand(httpCmd)
 
 	httpCmd.Flags().IntP("port", "p", 3001, "Port to run Application server on")
-	viper.BindPFlag("port", httpCmd.Flags().Lookup("port"))
-	// Here you will define your flags and configuration settings.
+	err := viper.BindPFlag("port", httpCmd.Flags().Lookup("port"))
+	if err != nil {
+		log.Fatalf("Unable to bind port variable: %v", err)
+	}
 
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// httpCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// httpCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

@@ -20,16 +20,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Verbose logs extra information when the version command is called.
-var Verbose bool
+var verbose bool
 
 // versionCmd represents the version command
 var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Version and build information.",
 	Run: func(cmd *cobra.Command, args []string) {
-		if !Verbose {
-			fmt.Println(RootCmd.Use + " " + buildInfo.Version)
+		if !verbose {
+			fmt.Println(rootCmd.Use + " " + buildInfo.Version)
 		} else {
 			info, err := buildInfo.JSON(true)
 			if err != nil {
@@ -42,7 +41,7 @@ var versionCmd = &cobra.Command{
 }
 
 func init() {
-	versionCmd.Flags().BoolVarP(&Verbose, "verbose", "v", false, "verbose output")
-	RootCmd.AddCommand(versionCmd)
+	versionCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
+	rootCmd.AddCommand(versionCmd)
 
 }
