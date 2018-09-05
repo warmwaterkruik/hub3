@@ -39,6 +39,7 @@ type NodeConfig struct {
 	Errors   []*DuplicateError
 }
 
+// DuplicateError holds all the information for a Duplicate CLevel
 type DuplicateError struct {
 	Path     string `json:"path"`
 	Spec     string `json:"spec"`
@@ -51,6 +52,7 @@ type DuplicateError struct {
 	Depth    int32  `json:"depth"`
 }
 
+// ErrorToCSV converts all the errors during conversion to CSV
 func (nc *NodeConfig) ErrorToCSV() ([]byte, error) {
 	var b bytes.Buffer
 	s := func(input string) string {

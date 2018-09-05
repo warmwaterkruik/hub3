@@ -21,8 +21,8 @@ import (
 	"github.com/olivere/elastic"
 )
 
-// ReadEAD reads an ead2002 XML from a path
-func ReadEAD(path string) (*Cead, error) {
+// readEAD reads an ead2002 XML from a path
+func readEAD(path string) (*Cead, error) {
 	rawEAD, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -37,6 +37,7 @@ func eadParse(src []byte) (*Cead, error) {
 	return ead, err
 }
 
+// ProcessUpload processes an upload of an EAD file and stores it as FragmentGraph
 func ProcessUpload(r *http.Request, w http.ResponseWriter, spec string, p *elastic.BulkProcessor) (uint64, error) {
 
 	ds, _, err := models.GetOrCreateDataSet(spec)
@@ -537,7 +538,7 @@ type Cc12 struct {
 	Attrlevel       string           `xml:"level,attr"  json:",omitempty"`
 	Attrotherlevel  string           `xml:"otherlevel,attr"  json:",omitempty"`
 	Caccessrestrict *Caccessrestrict `xml:"accessrestrict,omitempty" json:"accessrestrict,omitempty"`
-	Nested          []*Cc12          `xml:"c12,omitempty" json:"c12,omitempty"`
+	Nested          []*Cc13          `xml:"c13,omitempty" json:"c13,omitempty"`
 	Cdid            *Cdid            `xml:"did,omitempty" json:"did,omitempty"`
 	Cscopecontent   *Cscopecontent   `xml:"scopecontent,omitempty" json:"scopecontent,omitempty"`
 }
@@ -557,11 +558,11 @@ func (c Cc12) GetNested() []CLevel {
 }
 
 type Cc13 struct {
-	XMLName         xml.Name         `xml:"c12,omitempty" json:"c12,omitempty"`
+	XMLName         xml.Name         `xml:"c13,omitempty" json:"c13,omitempty"`
 	Attrlevel       string           `xml:"level,attr"  json:",omitempty"`
 	Attrotherlevel  string           `xml:"otherlevel,attr"  json:",omitempty"`
 	Caccessrestrict *Caccessrestrict `xml:"accessrestrict,omitempty" json:"accessrestrict,omitempty"`
-	Nested          []*Cc12          `xml:"c12,omitempty" json:"c12,omitempty"`
+	Nested          []*Cc14          `xml:"c14,omitempty" json:"c14,omitempty"`
 	Cdid            *Cdid            `xml:"did,omitempty" json:"did,omitempty"`
 	Cscopecontent   *Cscopecontent   `xml:"scopecontent,omitempty" json:"scopecontent,omitempty"`
 }
@@ -581,11 +582,11 @@ func (c Cc13) GetNested() []CLevel {
 }
 
 type Cc14 struct {
-	XMLName         xml.Name         `xml:"c12,omitempty" json:"c12,omitempty"`
+	XMLName         xml.Name         `xml:"c14,omitempty" json:"c14,omitempty"`
 	Attrlevel       string           `xml:"level,attr"  json:",omitempty"`
 	Attrotherlevel  string           `xml:"otherlevel,attr"  json:",omitempty"`
 	Caccessrestrict *Caccessrestrict `xml:"accessrestrict,omitempty" json:"accessrestrict,omitempty"`
-	Nested          []*Cc12          `xml:"c12,omitempty" json:"c12,omitempty"`
+	Nested          []*Cc15          `xml:"c15,omitempty" json:"c15,omitempty"`
 	Cdid            *Cdid            `xml:"did,omitempty" json:"did,omitempty"`
 	Cscopecontent   *Cscopecontent   `xml:"scopecontent,omitempty" json:"scopecontent,omitempty"`
 }
@@ -605,11 +606,11 @@ func (c Cc14) GetNested() []CLevel {
 }
 
 type Cc15 struct {
-	XMLName         xml.Name         `xml:"c12,omitempty" json:"c12,omitempty"`
+	XMLName         xml.Name         `xml:"c15,omitempty" json:"c15,omitempty"`
 	Attrlevel       string           `xml:"level,attr"  json:",omitempty"`
 	Attrotherlevel  string           `xml:"otherlevel,attr"  json:",omitempty"`
 	Caccessrestrict *Caccessrestrict `xml:"accessrestrict,omitempty" json:"accessrestrict,omitempty"`
-	Nested          []*Cc12          `xml:"c12,omitempty" json:"c12,omitempty"`
+	Nested          []*Cc16          `xml:"c16,omitempty" json:"c16,omitempty"`
 	Cdid            *Cdid            `xml:"did,omitempty" json:"did,omitempty"`
 	Cscopecontent   *Cscopecontent   `xml:"scopecontent,omitempty" json:"scopecontent,omitempty"`
 }
@@ -629,11 +630,11 @@ func (c Cc15) GetNested() []CLevel {
 }
 
 type Cc16 struct {
-	XMLName         xml.Name         `xml:"c12,omitempty" json:"c12,omitempty"`
+	XMLName         xml.Name         `xml:"c16,omitempty" json:"c16,omitempty"`
 	Attrlevel       string           `xml:"level,attr"  json:",omitempty"`
 	Attrotherlevel  string           `xml:"otherlevel,attr"  json:",omitempty"`
 	Caccessrestrict *Caccessrestrict `xml:"accessrestrict,omitempty" json:"accessrestrict,omitempty"`
-	Nested          []*Cc12          `xml:"c12,omitempty" json:"c12,omitempty"`
+	Nested          []*Cc17          `xml:"c17,omitempty" json:"c17,omitempty"`
 	Cdid            *Cdid            `xml:"did,omitempty" json:"did,omitempty"`
 	Cscopecontent   *Cscopecontent   `xml:"scopecontent,omitempty" json:"scopecontent,omitempty"`
 }
@@ -653,11 +654,11 @@ func (c Cc16) GetNested() []CLevel {
 }
 
 type Cc17 struct {
-	XMLName         xml.Name         `xml:"c12,omitempty" json:"c12,omitempty"`
+	XMLName         xml.Name         `xml:"c17,omitempty" json:"c17,omitempty"`
 	Attrlevel       string           `xml:"level,attr"  json:",omitempty"`
 	Attrotherlevel  string           `xml:"otherlevel,attr"  json:",omitempty"`
 	Caccessrestrict *Caccessrestrict `xml:"accessrestrict,omitempty" json:"accessrestrict,omitempty"`
-	Nested          []*Cc12          `xml:"c12,omitempty" json:"c12,omitempty"`
+	Nested          []*Cc18          `xml:"c18,omitempty" json:"c18,omitempty"`
 	Cdid            *Cdid            `xml:"did,omitempty" json:"did,omitempty"`
 	Cscopecontent   *Cscopecontent   `xml:"scopecontent,omitempty" json:"scopecontent,omitempty"`
 }
@@ -677,11 +678,11 @@ func (c Cc17) GetNested() []CLevel {
 }
 
 type Cc18 struct {
-	XMLName         xml.Name         `xml:"c12,omitempty" json:"c12,omitempty"`
+	XMLName         xml.Name         `xml:"c18,omitempty" json:"c18,omitempty"`
 	Attrlevel       string           `xml:"level,attr"  json:",omitempty"`
 	Attrotherlevel  string           `xml:"otherlevel,attr"  json:",omitempty"`
 	Caccessrestrict *Caccessrestrict `xml:"accessrestrict,omitempty" json:"accessrestrict,omitempty"`
-	Nested          []*Cc12          `xml:"c12,omitempty" json:"c12,omitempty"`
+	Nested          []*Cc19          `xml:"c19,omitempty" json:"c19,omitempty"`
 	Cdid            *Cdid            `xml:"did,omitempty" json:"did,omitempty"`
 	Cscopecontent   *Cscopecontent   `xml:"scopecontent,omitempty" json:"scopecontent,omitempty"`
 }
@@ -701,11 +702,11 @@ func (c Cc18) GetNested() []CLevel {
 }
 
 type Cc19 struct {
-	XMLName         xml.Name         `xml:"c12,omitempty" json:"c12,omitempty"`
+	XMLName         xml.Name         `xml:"c19,omitempty" json:"c19,omitempty"`
 	Attrlevel       string           `xml:"level,attr"  json:",omitempty"`
 	Attrotherlevel  string           `xml:"otherlevel,attr"  json:",omitempty"`
 	Caccessrestrict *Caccessrestrict `xml:"accessrestrict,omitempty" json:"accessrestrict,omitempty"`
-	Nested          []*Cc12          `xml:"c12,omitempty" json:"c12,omitempty"`
+	Nested          []*Cc20          `xml:"c20,omitempty" json:"c20,omitempty"`
 	Cdid            *Cdid            `xml:"did,omitempty" json:"did,omitempty"`
 	Cscopecontent   *Cscopecontent   `xml:"scopecontent,omitempty" json:"scopecontent,omitempty"`
 }
@@ -725,13 +726,13 @@ func (c Cc19) GetNested() []CLevel {
 }
 
 type Cc20 struct {
-	XMLName         xml.Name         `xml:"c12,omitempty" json:"c12,omitempty"`
+	XMLName         xml.Name         `xml:"c20,omitempty" json:"c20,omitempty"`
 	Attrlevel       string           `xml:"level,attr"  json:",omitempty"`
 	Attrotherlevel  string           `xml:"otherlevel,attr"  json:",omitempty"`
 	Caccessrestrict *Caccessrestrict `xml:"accessrestrict,omitempty" json:"accessrestrict,omitempty"`
-	Nested          []*Cc12          `xml:"c12,omitempty" json:"c12,omitempty"`
-	Cdid            *Cdid            `xml:"did,omitempty" json:"did,omitempty"`
-	Cscopecontent   *Cscopecontent   `xml:"scopecontent,omitempty" json:"scopecontent,omitempty"`
+	Nested          []*Cc20
+	Cdid            *Cdid          `xml:"did,omitempty" json:"did,omitempty"`
+	Cscopecontent   *Cscopecontent `xml:"scopecontent,omitempty" json:"scopecontent,omitempty"`
 }
 
 func (c Cc20) GetXMLName() xml.Name                 { return c.XMLName }
