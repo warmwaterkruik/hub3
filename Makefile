@@ -16,7 +16,7 @@ LDFLAGS:=-X main.Version=$(VERSION) -X main.BuildStamp=`date '+%Y-%m-%d_%I:%M:%S
 print-%  : ; @echo $* = $($*)
 
 clean:
-	rm -rf $(NAME) build report gin-bin result.bin *.coverprofile */*.coverprofile hub3/rapid.db hub3/models/rapid.db dist server/assets/assets_vfsdata.go rapidctl/rapidctl rapidctl/*.xml rapidctl/build target rapid-saas results.bin *.log coverage.out
+	rm -rf $(NAME) build report gin-bin result.bin *.coverprofile */*.coverprofile hub3/rapid.db hub3/models/rapid.db dist server/assets/assets_vfsdata.go rapidctl/rapidctl rapidctl/*.xml rapidctl/build target rapid-saas results.bin *.log coverage.out webresource
 
 clean-harvesting:
 	rm -rf *_ids.txt *_records.xml
