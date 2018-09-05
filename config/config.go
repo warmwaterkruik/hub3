@@ -87,6 +87,7 @@ type ElasticSearch struct {
 	MimimumShouldMatch string   `json:"mimimumShouldMatch"`
 }
 
+// HasAuthentication determines if ElasticSearch should initialise with Authentication
 func (es ElasticSearch) HasAuthentication() bool {
 	return len(es.UserName) > 0 && len(es.Password) > 0
 }
@@ -105,15 +106,26 @@ type HTTP struct {
 
 // RDF holds all the configuration for SPARQL queries and RDF conversions
 type RDF struct {
-	SparqlEnabled    bool   `json:"sparqlEnabled"`    // Enable the SPARQL proxy
-	SparqlHost       string `json:"sparqlHost"`       // the base-url to the SPARQL endpoint including the scheme and the port
-	SparqlPath       string `json:"sparqlPath"`       // the relative path of the endpoint. This can should contain the database name that is injected when the sparql endpoint is build
-	SparqlUpdatePath string `json:"sparqlUpdatePath"` // the relative path of the update endpoint. This can should contain the database name that is injected when the sparql endpoint is build
-	GraphStorePath   string `json:"dataPath"`         // the relative GraphStore path of the endpoint. This can should contain the database name that is injected when the sparql endpoint is build
-	BaseURL          string `json:"baseUrl"`          // the RDF baseUrl used for minting new URIs (should not include scheme)
-	BaseScheme       string `json:"baseScheme"`       // the scheme (http or https) used in the baseURL
-	RDFStoreEnabled  bool   `json:"rdfStoreEnabled"`  // Store to Triple Store while saving RDF
-	// the RDF entryPoints. Lookups are made on the fully qualified URIs. It is sometimes needed to support other baseUrls as well.
+	SparqlEnabled bool `json:"sparqlEnabled"` // Enable the SPARQL proxy
+	// the base-url to the SPARQL endpoint including the scheme and the port
+	SparqlHost string `json:"sparqlHost"`
+	// the relative path of the endpoint. This can should contain the database name that is injected when the sparql
+	// endpoint is build
+	SparqlPath string `json:"sparqlPath"`
+	// the relative path of the update endpoint. This can should contain the database name that is injected when the
+	// sparql endpoint is build
+	SparqlUpdatePath string `json:"sparqlUpdatePath"`
+	// the relative GraphStore path of the endpoint. This can should contain the database name that is injected when
+	// the sparql endpoint is build
+	GraphStorePath string `json:"dataPath"`
+	// the RDF baseUrl used for minting new URIs (should not include scheme)
+	BaseURL string `json:"baseUrl"`
+	// the scheme (http or https) used in the baseURL
+	BaseScheme string `json:"baseScheme"`
+	// Store to Triple Store while saving RDF
+	RDFStoreEnabled bool `json:"rdfStoreEnabled"`
+	// the RDF entryPoints. Lookups are made on the fully qualified URIs. It is sometimes needed to support other
+	// baseUrls as well.
 	// The entry-points need to be fully qualified, i.e. with their scheme.
 	RoutedEntryPoints []string `json:"RoutedEntryPoints"`
 	Tags              string   `json:"tags" mapstructure:"tags"`
@@ -146,7 +158,7 @@ type WebResource struct {
 	Enabled                   bool   `json:"enabled"`          // Make the webresource endpoint available
 	WebResourceDir            string `json:"sourceDir"`        // Target directory for the webresources
 	CacheResourceDir          string `json:"cacheDir"`         // cache directory for the webresources
-	enableSearch              bool   `json:"enableSearch"`     // enable searching for images in ElasticSearch
+	EnableSearch              bool   `json:"enableSearch"`     // enable searching for images in ElasticSearch
 	MediaManagerHost          string `json:"mediaManagerHost"` // the domain to build the derivatives
 	SmallDefault              string `json:"smallDefault"`
 	MediumDefault             string `json:"mediumDefault"`
@@ -164,17 +176,17 @@ type ImageProxy struct {
 	ScaleUp     bool     `json:"scaleUp"`     // Allow images to scale beyond their original dimensions.
 	TimeOut     int      `json:"timeout"`     // timelimit for request served by this proxy. 0 is for no timeout
 	Deepzoom    bool     `json:"deepzoom"`    // Enable deepzoom of remote images.
-	ProxyPrefix string   `json:"proxyPrefix"` // The prefix where we mount the imageproxy. default: imageproxy. default: imageproxy.
+	ProxyPrefix string   `json:"proxyPrefix"` // The prefix where we mount the imageproxy. default: imageproxy.
 }
 
 // LOD holds all the configuration for the Linked Open Data (LOD) functionality
 type LOD struct {
 	Enabled           bool   `json:"enabled"`        // Make the lod endpoint available
-	Resource          string `json:"resource"`       // the 303 redirect entry point. This is where the content negotiation happens
+	Resource          string `json:"resource"`       // the 303 redirect entry point for LOD content negotiation
 	HTML              string `json:"html"`           // the endpoint that renders the data as formatted HTML
-	RDF               string `json:"rdf"`            // the endpoint that renders the RDF data in the requested RDF format. Currently, JSON-LD and N-triples are supported
+	RDF               string `json:"rdf"`            // the endpoint that renders the RDF data in the requested RDF format.
 	SingleEndpoint    string `json:"singleEndpoint"` // when this is set it overrides the other endpoints
-	HTMLRedirectRegex string `json:"redirectregex"`  // the regular expression to convert the subject uri to the uri for the external Page view
+	HTMLRedirectRegex string `json:"redirectregex"`  // the regular expression to redirect to the external Page view
 }
 
 // SiteMap holds all the configuration for the sitemap generation
@@ -185,6 +197,7 @@ type SiteMap struct {
 	Gzip    bool   `json:"gzip"`
 }
 
+// EAD hold all the information for the EAD cache.
 type EAD struct {
 	CacheDir string `json:"cacheDir"`
 }
