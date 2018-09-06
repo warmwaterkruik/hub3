@@ -1,4 +1,4 @@
-package server
+package handler
 
 import (
 	"fmt"
@@ -10,7 +10,6 @@ import (
 	c "github.com/delving/rapid-saas/config"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/render"
-	"github.com/labstack/gommon/log"
 )
 
 // SparqlResource is a struct for the Search routes
@@ -28,12 +27,10 @@ func (rs SparqlResource) Routes() chi.Router {
 
 func sparqlProxy(w http.ResponseWriter, r *http.Request) {
 	if !c.Config.RDF.SparqlEnabled {
-		log.Printf("sparql is disabled\n")
 		render.JSON(w, r, &ErrorMessage{"not enabled", ""})
 		return
 	}
 	var query string
-	log.Print(r.Method)
 	switch r.Method {
 	case http.MethodGet:
 		query = r.URL.Query().Get("query")
@@ -49,7 +46,6 @@ func sparqlProxy(w http.ResponseWriter, r *http.Request) {
 	if !strings.Contains(strings.ToLower(query), "limit ") {
 		query = fmt.Sprintf("%s LIMIT 25", query)
 	}
-	log.Info(query)
 	resp, statusCode, contentType, err := runSparqlQuery(query)
 	if err != nil {
 		render.Status(r, http.StatusBadRequest)
@@ -67,10 +63,9 @@ func sparqlProxy(w http.ResponseWriter, r *http.Request) {
 
 // runSparqlQuery sends a SPARQL query to the SPARQL-endpoint specified in the configuration
 func runSparqlQuery(query string) (body []byte, statusCode int, contentType string, err error) {
-	log.Debugf("Sparql Query: %s", query)
 	req, err := http.NewRequest("Get", c.Config.GetSparqlEndpoint(""), nil)
 	if err != nil {
-		log.Errorf("Unable to create sparql request %s", err)
+		return
 	}
 	req.Header.Set("Accept", "application/sparql-results+json")
 	q := req.URL.Query()
@@ -82,12 +77,12 @@ func runSparqlQuery(query string) (body []byte, statusCode int, contentType stri
 	}
 	resp, err := netClient.Do(req)
 	if err != nil {
-		log.Errorf("Error in sparql query: %s", err)
+		return
 	}
 	body, err = ioutil.ReadAll(resp.Body)
 	defer resp.Body.Close()
 	if err != nil {
-		log.Errorf("Unable to read the response body with error: %s", err)
+		return
 	}
 	statusCode = resp.StatusCode
 	contentType = resp.Header.Get("Content-Type")

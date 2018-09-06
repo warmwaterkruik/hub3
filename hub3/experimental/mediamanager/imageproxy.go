@@ -13,7 +13,9 @@
 // limitations under the License.
 
 // Package server imageproxy proxies requests for remote images
-package server
+package mediamanager
+
+// TODO remove functionality in favour of intergrated functionality in media manager.
 
 import (
 	"fmt"
@@ -33,6 +35,14 @@ import (
 
 	c "github.com/delving/rapid-saas/config"
 )
+
+/*
+Example for chi-based routing:
+
+	// WebResource & imageproxy configuration
+	proxyPrefix := fmt.Sprintf("/%s/*", c.Config.ImageProxy.ProxyPrefix)
+	r.With(StripPrefix).Get(proxyPrefix, serveProxyImage)
+*/
 
 const defaultMemorySize = 100
 

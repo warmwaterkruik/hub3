@@ -12,13 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package server
+package handler
 
 import (
 	"net/http"
 
 	"github.com/go-chi/render"
 )
+
+// ErrorMessage is a placeholder for disabled endpoints
+type ErrorMessage struct {
+	Status  string `json:"status"`
+	Message string `json:"message"`
+}
 
 //--
 // Error response payloads & renderers

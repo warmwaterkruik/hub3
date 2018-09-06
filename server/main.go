@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	c "github.com/delving/rapid-saas/config"
+	"github.com/delving/rapid-saas/hub3/handler"
 	"github.com/delving/rapid-saas/hub3/index"
 	"github.com/delving/rapid-saas/hub3/models"
 	"github.com/delving/rapid-saas/server/assets"
@@ -39,12 +40,6 @@ import (
 	"github.com/urfave/negroni"
 	negroniprometheus "github.com/zbindenren/negroni-prometheus"
 )
-
-// ErrorMessage is a placeholder for disabled endpoints
-type ErrorMessage struct {
-	Status  string `json:"status"`
-	Message string `json:"message"`
-}
 
 // Start starts a graceful webserver process.
 func Start(buildInfo *c.BuildVersionInfo) {
@@ -143,10 +138,6 @@ func Start(buildInfo *c.BuildVersionInfo) {
 		return
 	})
 
-	// WebResource & imageproxy configuration
-	proxyPrefix := fmt.Sprintf("/%s/*", c.Config.ImageProxy.ProxyPrefix)
-	r.With(StripPrefix).Get(proxyPrefix, serveProxyImage)
-
 	// API configuration
 	if c.Config.OAIPMH.Enabled {
 		r.Get("/api/oai-pmh", oaiPmhEndpoint)
@@ -158,6 +149,7 @@ func Start(buildInfo *c.BuildVersionInfo) {
 	r.Post("/api/bulk/sync", bulkSyncStart)
 	r.Get("/api/bulk/sync/{id}", bulkSyncProgress)
 	r.Delete("/api/bulk/sync/{id}", bulkSyncCancel)
+
 	// TODO remove later
 	r.Post("/api/index/bulk", bulkAPI)
 	r.Post("/api/index/fuzzed", generateFuzzed)
@@ -185,7 +177,7 @@ func Start(buildInfo *c.BuildVersionInfo) {
 	r.Mount("/api/search", SearchResource{}.Routes())
 
 	// Sparql endpoint
-	r.Mount("/sparql", SparqlResource{}.Routes())
+	r.Mount("/sparql", handler.SparqlResource{}.Routes())
 
 	// RDF indexing endpoint
 	r.Mount("/api/es", IndexResource{}.Routes())
