@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/delving/rapid-saas/config"
-	"github.com/delving/rapid-saas/hub3/mapping"
+	"github.com/delving/rapid-saas/hub3/index/mapping"
 	elastic "github.com/olivere/elastic"
 )
 

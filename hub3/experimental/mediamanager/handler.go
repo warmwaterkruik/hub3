@@ -12,19 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package server
+package mediamanager
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"path/filepath"
 	"strings"
 
 	c "github.com/delving/rapid-saas/config"
-	"github.com/delving/rapid-saas/hub3/mediamanager"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/render"
-	"github.com/labstack/gommon/log"
 )
 
 // WebResourceAPIResource is the router struct for webresource data
@@ -49,7 +48,6 @@ func listWebResource(w http.ResponseWriter, r *http.Request) {
 		}
 		log.Printf("matches: %s", matches)
 	}
-	log.Printf("urn: %s", urn)
 	render.JSON(w, r, `{"type": "thumbnail"}`)
 	return
 }
@@ -90,9 +88,11 @@ func (rs ExploreResource) Routes() chi.Router {
 		return
 	})
 	r.Get("/index", func(w http.ResponseWriter, r *http.Request) {
-		err := mediamanager.IndexWebResources(bp)
+		// todo insert bulk indexer also replace with interface
+		err := IndexWebResources(nil)
 		if err != nil {
-			log.Printf("Unable to index webresources: %s", err)
+			// todo add error.Wrap
+			return
 		}
 		return
 	})

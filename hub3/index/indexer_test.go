@@ -38,4 +38,4 @@ var _ = Describe("Indexer", func() {
 	})
 })
 
-//var testTurtleRecord = string(ioutil.ReadFile("test_data/test1.ttl"))
+//var testTurtleRecord = string(ioutil.ReadFile("testdata/test1.ttl"))

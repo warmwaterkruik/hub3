@@ -29,8 +29,8 @@ import (
 	"unsafe"
 
 	"github.com/delving/rapid-saas/config"
-	"github.com/delving/rapid-saas/hub3"
 	"github.com/delving/rapid-saas/hub3/fragments"
+	"github.com/delving/rapid-saas/hub3/handler"
 	"github.com/delving/rapid-saas/hub3/index"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
@@ -271,7 +271,7 @@ func processSearchRequest(w http.ResponseWriter, r *http.Request, searchRequest 
 				render.PlainText(w, r, err.Error())
 				return
 			}
-			action := &hub3.BulkAction{
+			action := &handler.BulkAction{
 				HubID:         rec.Meta.HubID,
 				Spec:          rec.Meta.Spec,
 				NamedGraphURI: rec.Meta.NamedGraphURI,

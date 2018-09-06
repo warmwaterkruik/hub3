@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	. "github.com/delving/rapid-saas/hub3/ead"
+	. "github.com/delving/rapid-saas/hub3/experimental/ead"
 	"github.com/delving/rapid-saas/hub3/fragments"
 )
 

@@ -134,7 +134,7 @@ pb.viewconfig:
 	@protoc --go_out=. hub3/fragments/viewconfig.proto
 
 pb.ead:
-	@protoc --go_out=. hub3/ead/ead.proto
+	@protoc --go_out=. hub3/experimental/ead/ead.proto
 
 cqlsh:
 	@docker exec -it cassandra0 cqlsh

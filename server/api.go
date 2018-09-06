@@ -27,10 +27,10 @@ import (
 	"strings"
 
 	c "github.com/delving/rapid-saas/config"
-	"github.com/delving/rapid-saas/hub3"
-	"github.com/delving/rapid-saas/hub3/ead"
+	"github.com/delving/rapid-saas/hub3/experimental/ead"
+	"github.com/delving/rapid-saas/hub3/experimental/harvesting"
 	"github.com/delving/rapid-saas/hub3/fragments"
-	"github.com/delving/rapid-saas/hub3/harvesting"
+	"github.com/delving/rapid-saas/hub3/handler"
 	"github.com/delving/rapid-saas/hub3/index"
 	"github.com/delving/rapid-saas/hub3/models"
 	"github.com/gammazero/workerpool"
@@ -498,7 +498,7 @@ func bulkSyncCancel(w http.ResponseWriter, r *http.Request) {
 // bulkApi receives bulkActions in JSON form (1 per line) and processes them in
 // ingestion pipeline.
 func bulkAPI(w http.ResponseWriter, r *http.Request) {
-	response, err := hub3.ReadActions(ctx, r.Body, bp, wp)
+	response, err := handler.ReadActions(ctx, r.Body, bp, wp)
 	if err != nil {
 		log.Println("Unable to read actions")
 		errR := ErrRender(err)
@@ -746,7 +746,7 @@ func generateFuzzed(w http.ResponseWriter, r *http.Request) {
 	actions := []string{}
 	for idx, rec := range records {
 		hubID := fmt.Sprintf("%s_%s_%d", c.Config.OrgID, spec, idx)
-		action := &hub3.BulkAction{
+		action := &handler.BulkAction{
 			HubID:         hubID,
 			OrgID:         c.Config.OrgID,
 			LocalID:       fmt.Sprintf("%d", idx),

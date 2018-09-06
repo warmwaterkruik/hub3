@@ -29,7 +29,7 @@ var _ = Describe("Posthook", func() {
 		Context("from an RDF string", func() {
 
 			It("should populate a graph", func() {
-				content, err := getRDFString("test_data/enb_test_1.nt")
+				content, err := getRDFString("testdata/enb_test_1.nt")
 				Expect(err).ToNot(HaveOccurred())
 				g := r.NewGraph(subject)
 				err = g.Parse(strings.NewReader(content), "text/turtle")
@@ -85,7 +85,7 @@ var _ = Describe("Posthook", func() {
 			})
 
 			It("should rewrite ebuCore predicates", func() {
-				content, err := getRDFString("test_data/enb_test_1.nt")
+				content, err := getRDFString("testdata/enb_test_1.nt")
 				Expect(err).ToNot(HaveOccurred())
 				g := r.NewGraph(subject)
 				err = g.Parse(strings.NewReader(content), "text/turtle")
@@ -104,7 +104,7 @@ var _ = Describe("Posthook", func() {
 			})
 
 			It("should sort the actual webresources resources in resourceSortOrder", func() {
-				content, err := getRDFString("test_data/enb_test_1.nt")
+				content, err := getRDFString("testdata/enb_test_1.nt")
 				Expect(err).ToNot(HaveOccurred())
 				g := r.NewGraph(subject)
 				err = g.Parse(strings.NewReader(content), "text/turtle")

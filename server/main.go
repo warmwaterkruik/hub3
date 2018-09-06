@@ -143,31 +143,9 @@ func Start(buildInfo *c.BuildVersionInfo) {
 		return
 	})
 
-
 	// WebResource & imageproxy configuration
 	proxyPrefix := fmt.Sprintf("/%s/*", c.Config.ImageProxy.ProxyPrefix)
 	r.With(StripPrefix).Get(proxyPrefix, serveProxyImage)
-
-	if c.Config.WebResource.Enabled {
-		r.Mount("/thumbnail", ThumbnailResource{}.Routes())
-		r.Mount("/deepzoom", DeepZoomResource{}.Routes())
-		r.Mount("/explore", ExploreResource{}.Routes())
-		r.Mount("/api/webresource", WebResourceAPIResource{}.Routes())
-		// legacy route
-		r.Get("/iip/deepzoom/mnt/tib/tiles/{orgId}/{spec}/{localId}.tif.dzi", renderDeepZoom)
-		// render cached directories
-		FileServer(r, "/webresource", getAbsolutePathToFileDir(c.Config.WebResource.CacheResourceDir))
-	}
-	//r.Get("/deepzoom", func(w http.ResponseWriter, r *http.Request) {
-	//cmd := exec.Command("vips", "dzsave", "/tmp/webresource/dev-org-id/test2/source/123.jpg", "/tmp/123")
-	//stdoutStderr, err := cmd.Output()
-	//if err != nil {
-	//log.Println("Something went wrong")
-	//fmt.Printf("%s\n", stdoutStderr)
-	//log.Println(err)
-	//}
-	//w.Write([]byte("zoomed"))
-	//})
 
 	// API configuration
 	if c.Config.OAIPMH.Enabled {

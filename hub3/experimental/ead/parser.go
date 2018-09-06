@@ -21,8 +21,8 @@ import (
 	"github.com/olivere/elastic"
 )
 
-// readEAD reads an ead2002 XML from a path
-func readEAD(path string) (*Cead, error) {
+// ReadEAD reads an ead2002 XML from a path
+func ReadEAD(path string) (*Cead, error) {
 	rawEAD, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, err
