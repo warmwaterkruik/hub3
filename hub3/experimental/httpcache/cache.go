@@ -1,4 +1,4 @@
-package server
+package httpcache
 
 import (
 	"bytes"
@@ -18,6 +18,16 @@ import (
 	"github.com/go-chi/render"
 	"github.com/labstack/gommon/log"
 )
+
+/*
+Example of Routing with chi
+
+	if c.Config.Cache.Enabled {
+		r.Mount("/api/cache", CacheResource{}.Routes())
+		r.Handle(fmt.Sprintf("%s/*", c.Config.Cache.APIPrefix), cacheHandler())
+	}
+
+*/
 
 var httpCache *bigcache.BigCache
 

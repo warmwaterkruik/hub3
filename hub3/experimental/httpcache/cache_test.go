@@ -1,4 +1,4 @@
-package server_test
+package httpcache_test
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/delving/rapid-saas/config"
-	. "github.com/delving/rapid-saas/server"
+	. "github.com/delving/rapid-saas/hub3/experimental/httpcache"
 )
 
 var _ = Describe("Cache", func() {

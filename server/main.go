@@ -217,11 +217,6 @@ func Start(buildInfo *c.BuildVersionInfo) {
 		r.Mount("/debug", mw.Profiler())
 	}
 
-	if c.Config.Cache.Enabled {
-		r.Mount("/api/cache", CacheResource{}.Routes())
-		r.Handle(fmt.Sprintf("%s/*", c.Config.Cache.APIPrefix), cacheHandler())
-	}
-
 	n.UseHandler(r)
 	log.Printf("Using port: %d", c.Config.Port)
 	err := http.ListenAndServe(fmt.Sprintf(":%d", c.Config.Port), n)
