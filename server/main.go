@@ -25,9 +25,9 @@ import (
 
 	c "github.com/delving/rapid-saas/config"
 	"github.com/delving/rapid-saas/hub3/handler"
+	"github.com/delving/rapid-saas/hub3/handler/assets"
 	"github.com/delving/rapid-saas/hub3/index"
 	"github.com/delving/rapid-saas/hub3/models"
-	"github.com/delving/rapid-saas/server/assets"
 	"github.com/phyber/negroni-gzip/gzip"
 
 	"github.com/go-chi/chi"
@@ -68,6 +68,18 @@ func Start(buildInfo *c.BuildVersionInfo) {
 	m := negroniprometheus.NewMiddleware("rapid")
 	n.Use(m)
 
+	// workers etc
+	// TODO inject these dependencies
+
+	//var err error
+	//ctx = context.Background()
+	//bps := index.CreateBulkProcessorService()
+	//bp, err = bps.Do(ctx)
+	//if err != nil {
+	//log.Fatalf("Unable to start BulkProcessor: %s", err)
+	//}
+	//wp = workerpool.New(10)
+
 	// configure CORS, see https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
 	cors := cors.New(cors.Options{
 		//AllowedOrigins: []string{"*"},
@@ -107,12 +119,6 @@ func Start(buildInfo *c.BuildVersionInfo) {
 		return
 	})
 
-	// stats dashboard
-	r.Get("/api/stats/bySearchLabel", searchLabelStats)
-	//r.Get("/api/stats/bySearchLabel/{:label}", searchLabelStatsValues)
-	r.Get("/api/stats/byPredicate", predicateStats)
-	//r.Get("/api/stats/byPredicate/{:label}", searchLabelStatsValues)
-
 	// stastic serving on vfsgen files
 	r.Get("/api/search/v2/_docs", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/api/_docs", http.StatusSeeOther)
@@ -139,69 +145,62 @@ func Start(buildInfo *c.BuildVersionInfo) {
 	})
 
 	// API configuration
-	if c.Config.OAIPMH.Enabled {
-		r.Get("/api/oai-pmh", oaiPmhEndpoint)
-	}
+	// TODO move these to mount points
+	//if c.Config.OAIPMH.Enabled {
+	//r.Get("/api/oai-pmh", oaiPmhEndpoint)
+	//}
 
-	// Narthex endpoint
-	r.Post("/api/rdf/bulk", bulkAPI)
-	r.Get("/api/bulk/sync", bulkSyncList)
-	r.Post("/api/bulk/sync", bulkSyncStart)
-	r.Get("/api/bulk/sync/{id}", bulkSyncProgress)
-	r.Delete("/api/bulk/sync/{id}", bulkSyncCancel)
+	//// Narthex endpoint
+	//r.Mount("/api/bulk", handler.BulkAPIResource{}.Routes())
 
-	// TODO remove later
-	r.Post("/api/index/bulk", bulkAPI)
-	r.Post("/api/index/fuzzed", generateFuzzed)
+	//// CSV upload endpoint
+	//r.Post("/api/rdf/csv", csvUpload)
+	//r.Delete("/api/rdf/csv", csvDelete)
 
-	// CSV upload endpoint
-	r.Post("/api/rdf/csv", csvUpload)
-	r.Delete("/api/rdf/csv", csvDelete)
+	//// SKOS sync endpoint
+	//r.Get("/api/rdf/skos", skosSync)
+	//r.Post("/api/rdf/skos", skosUpload)
 
-	// SKOS sync endpoint
-	r.Get("/api/rdf/skos", skosSync)
-	r.Post("/api/rdf/skos", skosUpload)
+	//// RDF upload endpoint
+	//r.Post("/api/rdf/source", rdfUpload)
 
-	// RDF upload endpoint
-	r.Post("/api/rdf/source", rdfUpload)
+	//// EAD endpoint
+	//r.Post("/api/ead", eadUpload)
 
-	// EAD endpoint
-	r.Post("/api/ead", eadUpload)
+	//// Tree reconstruction endpoint
+	//r.Get("/api/tree/{spec}", treeList)
+	//r.Get("/api/tree/{spec}/{nodeID:.*$}", treeList)
+	//r.Get("/api/tree/{spec}/stats", treeStats)
 
-	// Tree reconstruction endpoint
-	r.Get("/api/tree/{spec}", treeList)
-	r.Get("/api/tree/{spec}/{nodeID:.*$}", treeList)
-	r.Get("/api/tree/{spec}/stats", treeStats)
+	// datasets
+	//r.Get("/api/datasets", listDataSets)
+	//r.Get("/api/datasets/histogram", listDataSetHistogram)
+	//r.Post("/api/datasets", createDataSet)
+	//r.Get("/api/datasets/{spec}", getDataSet)
+	//r.Get("/api/datasets/{spec}/stats", getDataSetStats)
+	//// later change to update dataset
+	//r.Post("/api/datasets/{spec}", createDataSet)
+	//r.Delete("/api/datasets/{spec}", deleteDataset)
+
+	//// fragments
+	//r.Get("/api/fragments", listFragments)
+	//r.Get("/fragments/{spec}", listFragments)
+	//r.Get("/fragments", listFragments)
+
+	//// namespaces
+	//r.Get("/api/namespaces", listNameSpaces)
 
 	// Search endpoint
-	r.Mount("/api/search", SearchResource{}.Routes())
+	r.Mount("/api/search", handler.SearchResource{}.Routes())
 
 	// Sparql endpoint
 	r.Mount("/sparql", handler.SparqlResource{}.Routes())
 
 	// RDF indexing endpoint
-	r.Mount("/api/es", IndexResource{}.Routes())
-
-	// datasets
-	r.Get("/api/datasets", listDataSets)
-	r.Get("/api/datasets/histogram", listDataSetHistogram)
-	r.Post("/api/datasets", createDataSet)
-	r.Get("/api/datasets/{spec}", getDataSet)
-	r.Get("/api/datasets/{spec}/stats", getDataSetStats)
-	// later change to update dataset
-	r.Post("/api/datasets/{spec}", createDataSet)
-	r.Delete("/api/datasets/{spec}", deleteDataset)
-
-	// fragments
-	r.Get("/api/fragments", listFragments)
-	r.Get("/fragments/{spec}", listFragments)
-	r.Get("/fragments", listFragments)
-
-	// namespaces
-	r.Get("/api/namespaces", listNameSpaces)
+	r.Mount("/api/es", handler.IndexResource{}.Routes())
 
 	// LoD routingendpoint
-	r.Mount("/", LODResource{}.Routes())
+	r.Mount("/", handler.LODResource{}.Routes())
 
 	// introspection
 	if c.Config.DevMode {

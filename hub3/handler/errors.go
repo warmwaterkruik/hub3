@@ -26,6 +26,13 @@ type ErrorMessage struct {
 	Message string `json:"message"`
 }
 
+// APIErrorMessage contains the default API error messages
+type APIErrorMessage struct {
+	HTTPStatus int    `json:"code"`
+	Message    string `json:"type"`
+	Error      error  `json:"error"`
+}
+
 //--
 // Error response payloads & renderers
 //--

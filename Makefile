@@ -16,7 +16,7 @@ LDFLAGS:=-X main.Version=$(VERSION) -X main.BuildStamp=`date '+%Y-%m-%d_%I:%M:%S
 print-%  : ; @echo $* = $($*)
 
 clean:
-	rm -rf $(NAME) build report gin-bin result.bin *.coverprofile */*.coverprofile hub3/rapid.db hub3/models/rapid.db dist server/assets/assets_vfsdata.go rapidctl/rapidctl rapidctl/*.xml rapidctl/build target rapid-saas results.bin *.log coverage.out webresource
+	rm -rf $(NAME) build report gin-bin result.bin *.coverprofile */*.coverprofile hub3/rapid.db hub3/models/rapid.db dist hub3/handler/assets/assets_vfsdata.go rapidctl/rapidctl rapidctl/*.xml rapidctl/build target rapid-saas results.bin *.log coverage.out webresource
 
 clean-harvesting:
 	rm -rf *_ids.txt *_records.xml
@@ -26,8 +26,8 @@ clean-build:
 	mkdir -p build
 
 create-assets:
-	@go run -tags=dev server/assets/assets_generate.go
-	mv assets_vfsdata.go server/assets/
+	@go run -tags=dev hub3/handler/assets/assets_generate.go
+	mv assets_vfsdata.go hub3/handler/assets/
 
 run:
 	@go run main.go
