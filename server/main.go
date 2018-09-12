@@ -114,7 +114,6 @@ func Start(buildInfo *c.BuildVersionInfo) {
 	})
 
 	r.Get("/version", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Printf("%+v\n", buildInfo)
 		render.JSON(w, r, buildInfo)
 		return
 	})
@@ -151,7 +150,7 @@ func Start(buildInfo *c.BuildVersionInfo) {
 	//}
 
 	//// Narthex endpoint
-	//r.Mount("/api/bulk", handler.BulkAPIResource{}.Routes())
+	r.Mount("/api/bulk", handler.BulkAPIResource{}.Routes())
 
 	//// CSV upload endpoint
 	//r.Post("/api/rdf/csv", csvUpload)
