@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/delving/rapid-saas/config"
-	"github.com/delving/rapid-saas/hub3/mapping"
 	elastic "github.com/olivere/elastic"
 )
 
@@ -53,87 +52,11 @@ func ESClient() *elastic.Client {
 
 			// setup ElasticSearch client
 			client = createESClient()
-			//defer client.Stop()
-			ensureESIndex("", false)
 		} else {
 			stdlog.Fatal("FATAL: trying to call elasticsearch when not enabled.")
 		}
 	}
 	return client
-}
-
-func IndexReset(index string) error {
-	ensureESIndex(index, true)
-	return nil
-}
-
-func ensureESIndex(index string, reset bool) {
-	if index == "" {
-		index = config.Config.ElasticSearch.IndexName
-	}
-	exists, err := ESClient().IndexExists(index).Do(ctx)
-	if err != nil {
-		// Handle error
-		stdlog.Fatal(err)
-	}
-	if exists && reset {
-		deleteIndex, err := ESClient().DeleteIndex(index).Do(ctx)
-		if err != nil {
-			stdlog.Fatal(err)
-		}
-		if !deleteIndex.Acknowledged {
-			stdlog.Printf("Unable to delete index %s", index)
-		}
-		exists = false
-	}
-
-	if !exists {
-		// Create a new index.
-		indexMapping := mapping.ESMapping
-		if config.Config.ElasticSearch.IndexV1 {
-			indexMapping = mapping.V1ESMapping
-		}
-		createIndex, err := client.CreateIndex(index).BodyJson(indexMapping).Do(ctx)
-		if err != nil {
-			// Handle error
-			stdlog.Fatal(err)
-		}
-		if !createIndex.Acknowledged {
-			stdlog.Println(createIndex.Acknowledged)
-			// Not acknowledged
-		}
-
-		// TODO: enable index updates later
-		//if !config.Config.ElasticSearch.IndexV1 {
-		//resp, err := client.IndexPutSettings(index).BodyJson(mapping.ESSettings).Do(ctx)
-		//if err != nil {
-		//// Handle error
-		//stdlog.Fatal(err)
-		//}
-		//if !resp.Acknowledged {
-		//stdlog.Println(createIndex.Acknowledged)
-		//// Not acknowledged
-		//}
-		//}
-		return
-	}
-	// TODO: enable index updates later
-	//service := client.IndexPutSettings(index)
-	//updateIndex, err := service.BodyJson(mapping).Do(ctx)
-	//if err != nil {
-	//stdlog.Fatal(err)
-	//return
-	//}
-	//if !updateIndex.Acknowledged {
-	//stdlog.Println(updateIndex.Acknowledged)
-	//// Not acknowledged
-	//}
-	return
-}
-
-// ListIndexes returns a list of all the ElasticSearch Indices.
-func ListIndexes() ([]string, error) {
-	return ESClient().IndexNames()
 }
 
 func createESClient() *elastic.Client {

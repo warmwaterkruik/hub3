@@ -24,7 +24,6 @@ import (
 	"strings"
 
 	c "github.com/delving/rapid-saas/config"
-	"github.com/delving/rapid-saas/hub3/index"
 	"github.com/delving/rapid-saas/hub3/models"
 	"github.com/delving/rapid-saas/server/assets"
 	"github.com/phyber/negroni-gzip/gzip"
@@ -300,7 +299,7 @@ func IntrospectionRouter(chiRouter chi.Router) http.Handler {
 
 func resetAll(w http.ResponseWriter, r *http.Request) {
 	// reset elasticsearch
-	err := index.IndexReset("")
+	err := s.Reset(r.Context(), "")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}

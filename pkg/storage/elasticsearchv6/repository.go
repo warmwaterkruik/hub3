@@ -132,8 +132,8 @@ func (s Storage) ESClient() *elastic.Client {
 	return s.client
 }
 
-// IndexReset does a full reset of the index
-func (s Storage) IndexReset(ctx context.Context, index string) error {
+// Reset does a full reset of the index
+func (s Storage) Reset(ctx context.Context, index string) error {
 	return ensureESIndex(ctx, s.client, index, true)
 }
 

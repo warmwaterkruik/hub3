@@ -1,12 +1,17 @@
 package engine
 
-import "github.com/delving/rapid-saas/pkg/domain"
+import (
+	"context"
+
+	"github.com/delving/rapid-saas/pkg/domain"
+)
 
 // Repository provides access to the storage
 type Repository interface {
 	Add(sr *domain.StoreRequest) error
 	QueuePostHook(sr *domain.StoreRequest) error
 	Flush() error
+	Reset(ctx context.Context, index string) error
 }
 
 // Service is the storage abstraction layer
@@ -14,6 +19,7 @@ type Service interface {
 	Add(sr *domain.StoreRequest) error
 	QueuePostHook(sr *domain.StoreRequest) error
 	Flush() error
+	Reset(ctx context.Context, index string) error
 }
 
 type service struct {
@@ -39,4 +45,9 @@ func (s service) QueuePostHook(sr *domain.StoreRequest) error {
 // Flush flushes all from the queue to the Repository Storage
 func (s service) Flush() error {
 	return s.r.Flush()
+}
+
+// Reset drops all storage and re-initializes it. Usefull for automated regression testing
+func (s service) Reset(ctx context.Context, index string) error {
+	return s.r.Reset(ctx, index)
 }
