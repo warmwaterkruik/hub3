@@ -90,7 +90,7 @@ func (rs ExploreResource) Routes() chi.Router {
 		return
 	})
 	r.Get("/index", func(w http.ResponseWriter, r *http.Request) {
-		err := mediamanager.IndexWebResources(bp)
+		err := mediamanager.IndexWebResources(s)
 		if err != nil {
 			log.Printf("Unable to index webresources: %s", err)
 		}

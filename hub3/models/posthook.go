@@ -12,7 +12,6 @@ import (
 	"time"
 
 	c "github.com/delving/rapid-saas/config"
-	"github.com/gammazero/workerpool"
 	r "github.com/kiivihal/rdf2go"
 	ld "github.com/linkeddata/gojsonld"
 	"github.com/parnurzeal/gorequest"
@@ -24,12 +23,6 @@ type PostHookJob struct {
 	Spec    string
 	Deleted bool
 	Subject string
-}
-
-// PostHookJobFactory can be used to fire off PostHookJob jobs
-type PostHookJobFactory struct {
-	Spec string
-	wp   *workerpool.WorkerPool
 }
 
 // NewPostHookJob creates a new PostHookJob and populates the rdf2go Graph

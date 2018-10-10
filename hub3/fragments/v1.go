@@ -25,7 +25,6 @@ import (
 
 	c "github.com/delving/rapid-saas/config"
 	r "github.com/kiivihal/rdf2go"
-	"github.com/olivere/elastic"
 
 	"github.com/parnurzeal/gorequest"
 )
@@ -145,25 +144,6 @@ func NewSystem(indexDoc map[string]interface{}, fb *FragmentBuilder) *System {
 	s.HasLandingPage = strconv.FormatBool(ok)
 	return s
 }
-
-//'slug': self.hub_id,
-//'spec': self.get_spec_name(),
-//'thumbnail': thumbnail if thumbnail else "",
-//'preview': "detail/foldout/{}/{}".format(doc_type, self.hub_id),
-//'caption': bindings.get_about_caption if bindings.get_about_caption else "",
-//'about_uri': self.source_uri,
-//'source_uri': self.source_uri,
-//'graph_name': self.named_graph,
-//'created_at': datetime.now().isoformat(),
-//'modified_at': datetime.now().isoformat(),
-//'source_graph': self.rdf_string(),
-//'proxy_resource_graph': None,
-//'web_resource_graph': None,
-//'content_hash': content_hash,
-//'hasGeoHash': "true" if bindings.has_geo() else ""false"",
-//'hasDigitalObject': "true" if thumbnail else ""false"",
-//'hasLandingePage': "true" if 'edm_isShownAt' in index_doc else ""false"",
-//'hasDeepZoom': "true" if 'nave_deepZoom' in index_doc else ""false"",
 
 // NewGraphFromTurtle creates a RDF graph from the 'text/turtle' format
 func NewGraphFromTurtle(re io.Reader) (*r.Graph, error) {
@@ -538,16 +518,4 @@ func (fb *FragmentBuilder) CreateV1IndexEntry(t *r.Triple) (*IndexEntry, error) 
 		return ie, fmt.Errorf("unknown object type: %#v", t.Object)
 	}
 	return ie, nil
-}
-
-// CreateESAction creates bulkAPIRequest from map[string]interface{}
-func CreateESAction(indexDoc map[string]interface{}, id string) (*elastic.BulkIndexRequest, error) {
-	v1Index := fmt.Sprintf("%s", c.Config.ElasticSearch.IndexName)
-	r := elastic.NewBulkIndexRequest().
-		Index(v1Index).
-		Type("void_edmrecord").
-		RetryOnConflict(3).
-		Id(id).
-		Doc(indexDoc)
-	return r, nil
 }

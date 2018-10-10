@@ -18,7 +18,7 @@ type IndexResource struct{}
 func (rs IndexResource) Routes() chi.Router {
 	r := chi.NewRouter()
 
-	r.Get("/stats", rs.Get) // GET
+	//r.Get("/stats", rs.Get) // GET
 	r.Get("/indexes", func(w http.ResponseWriter, r *http.Request) {
 		indexes, err := index.ListIndexes()
 		if err != nil {
@@ -39,8 +39,8 @@ func (rs IndexResource) Routes() chi.Router {
 }
 
 // Get returns JSON formatted statistics for the BulkProcessor
-func (rs IndexResource) Get(w http.ResponseWriter, r *http.Request) {
-	stats := index.BulkIndexStatistics(bp)
-	render.PlainText(w, r, fmt.Sprintf("stats: %v", stats))
-	return
-}
+//func (rs IndexResource) Get(w http.ResponseWriter, r *http.Request) {
+//stats := index.BulkIndexStatistics(s)
+//render.PlainText(w, r, fmt.Sprintf("stats: %v", stats))
+//return
+//}

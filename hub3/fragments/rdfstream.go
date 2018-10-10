@@ -1,6 +1,7 @@
 package fragments
 
 import (
+	"encoding/json"
 	fmt "fmt"
 	"log"
 	"mime/multipart"
@@ -8,8 +9,10 @@ import (
 
 	rdf "github.com/deiu/gon3"
 	c "github.com/delving/rapid-saas/config"
+	"github.com/delving/rapid-saas/pkg/domain"
+	"github.com/delving/rapid-saas/pkg/engine"
 	r "github.com/kiivihal/rdf2go"
-	elastic "github.com/olivere/elastic"
+	"github.com/pkg/errors"
 )
 
 // parseTurtleFile creates a graph from an uploaded file
@@ -63,9 +66,10 @@ type RDFUploader struct {
 	Revision     int32
 	rm           *ResourceMap
 	subjects     []string
+	s            engine.Service
 }
 
-func NewRDFUploader(orgID, spec, subjectClass, typePredicate, idSplitter string, revision int) *RDFUploader {
+func NewRDFUploader(orgID, spec, subjectClass, typePredicate, idSplitter string, revision int, s engine.Service) *RDFUploader {
 	return &RDFUploader{
 		OrgID:        orgID,
 		Spec:         spec,
@@ -73,6 +77,7 @@ func NewRDFUploader(orgID, spec, subjectClass, typePredicate, idSplitter string,
 		TypeClassURI: typePredicate,
 		IDSplitter:   idSplitter,
 		Revision:     int32(revision),
+		s:            s,
 	}
 }
 
@@ -114,26 +119,35 @@ func (upl *RDFUploader) createFragmentGraph(subject string) (*FragmentGraph, err
 	return fg, nil
 }
 
-func (upl *RDFUploader) SaveFragmentGraphs(p *elastic.BulkProcessor) (int, error) {
+func (upl *RDFUploader) SaveFragmentGraphs() (int, error) {
 	var seen int
+	var err error
 	for _, s := range upl.subjects {
 		seen++
 		fg, err := upl.createFragmentGraph(s)
 		if err != nil {
 			return 0, err
 		}
-		r := elastic.NewBulkIndexRequest().
-			Index(c.Config.ElasticSearch.IndexName).
+		b, err := json.Marshal(fg)
+		if err != nil {
+			return 0, errors.Wrapf(err, "unable to marshal fragment graph")
+		}
+
+		r := domain.NewStoreRequest().
+			ID(fg.Meta.HubID).
 			Type(DocType).
-			RetryOnConflict(3).
-			Id(fg.Meta.HubID).
-			Doc(fg)
-		p.Add(r)
+			Index(c.Config.ElasticSearch.IndexName).
+			Doc(string(b))
+		err = upl.s.Add(r)
+		if err != nil {
+			return 0, err
+		}
+
 	}
-	return seen, nil
+	return seen, err
 }
 
-func (upl *RDFUploader) IndexFragments(p *elastic.BulkProcessor) (int, error) {
+func (upl *RDFUploader) IndexFragments(s engine.Service) (int, error) {
 
 	fg := NewFragmentGraph()
 	fg.Meta = &Header{
@@ -156,7 +170,7 @@ func (upl *RDFUploader) IndexFragments(p *elastic.BulkProcessor) (int, error) {
 
 		for _, frag := range frags {
 			frag.Meta.AddTags("sourceUpload")
-			err := frag.AddTo(p)
+			err := frag.AddTo(s)
 			if err != nil {
 				return 0, err
 			}

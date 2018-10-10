@@ -16,6 +16,7 @@ package fragments
 
 import (
 	"context"
+	"encoding/json"
 	fmt "fmt"
 	"log"
 	"net/url"
@@ -25,8 +26,11 @@ import (
 
 	"github.com/OneOfOne/xxhash"
 	c "github.com/delving/rapid-saas/config"
+	"github.com/delving/rapid-saas/pkg/domain"
+	"github.com/delving/rapid-saas/pkg/engine"
 	r "github.com/kiivihal/rdf2go"
 	elastic "github.com/olivere/elastic"
+	"github.com/pkg/errors"
 )
 
 // FragmentDocType is the ElasticSearch doctype for the Fragment
@@ -235,22 +239,27 @@ func (f *Fragment) ID() string {
 
 // CreateBulkIndexRequest converts the fragment into a request that can be
 // submitted to the ElasticSearch BulkIndexService
-func (f Fragment) CreateBulkIndexRequest() (*elastic.BulkIndexRequest, error) {
-	r := elastic.NewBulkIndexRequest().
+func (f Fragment) CreateBulkIndexRequest() (*domain.StoreRequest, error) {
+	b, err := json.Marshal(f)
+	if err != nil {
+		return nil, errors.Wrapf(err, "unable to marshal fragment to string")
+	}
+	r := domain.NewStoreRequest().
 		Index(c.Config.ElasticSearch.IndexName).
 		Type(DocType).
-		Id(f.ID()).
-		Doc(f)
+		ID(f.ID()).
+		Doc(string(b))
+
 	return r, nil
 }
 
 // AddTo adds the BulkableRequest to the Storage interface where it is flushed periodically.
-func (f Fragment) AddTo(p *elastic.BulkProcessor) error {
+func (f Fragment) AddTo(s engine.Service) error {
 	cbr, err := f.CreateBulkIndexRequest()
 	if err != nil {
 		return err
 	}
-	p.Add(cbr)
+	s.Add(cbr)
 	return nil
 }
 
@@ -295,7 +304,7 @@ func (f Fragment) AddTo(p *elastic.BulkProcessor) error {
 //}
 
 // SaveDataSet creates a fragment entry for a Dataset
-func SaveDataSet(spec string, p *elastic.BulkProcessor) error {
+func SaveDataSet(spec string, s engine.Service) error {
 	fg := NewFragmentGraph()
 	fg.Meta.Spec = "datasets"
 	fb := NewFragmentBuilder(fg)

@@ -28,9 +28,10 @@ import (
 	c "github.com/delving/rapid-saas/config"
 	"github.com/delving/rapid-saas/hub3/fragments"
 	"github.com/delving/rapid-saas/hub3/models"
-	"github.com/gammazero/workerpool"
+	"github.com/delving/rapid-saas/pkg/domain"
+	"github.com/delving/rapid-saas/pkg/engine"
 	r "github.com/kiivihal/rdf2go"
-	"github.com/olivere/elastic"
+	"github.com/pkg/errors"
 
 	"github.com/parnurzeal/gorequest"
 )
@@ -49,8 +50,7 @@ type BulkAction struct {
 	RDF           string `json:"rdf"`
 	GraphMimeType string `json:"graphMimeType"`
 	SubjectType   string `json:"subjectType"`
-	p             *elastic.BulkProcessor
-	wp            *workerpool.WorkerPool
+	s             engine.Service
 }
 
 // SparqlUpdate contains the elements to perform a SPARQL update query
@@ -111,7 +111,7 @@ type BulkActionResponse struct {
 }
 
 // ReadActions reads BulkActions from an io.Reader line by line.
-func ReadActions(ctx context.Context, r io.Reader, p *elastic.BulkProcessor, wp *workerpool.WorkerPool) (BulkActionResponse, error) {
+func ReadActions(ctx context.Context, r io.Reader, s engine.Service) (BulkActionResponse, error) {
 	//log.Println("Start reading actions.")
 	scanner := bufio.NewScanner(r)
 	buf := make([]byte, 0, 64*1024)
@@ -133,8 +133,7 @@ func ReadActions(ctx context.Context, r io.Reader, p *elastic.BulkProcessor, wp 
 			log.Print(err)
 			continue
 		}
-		action.p = p
-		action.wp = wp
+		action.s = s
 
 		//err = ioutil.WriteFile(fmt.Sprintf("/tmp/es_actions/%s.json", action.HubID), []byte(action.Graph), 0644)
 		//err = ioutil.WriteFile(fmt.Sprintf("/tmp/raw_graph/%s.json", action.HubID), []byte(action.Graph), 0644)
@@ -177,7 +176,7 @@ func (action BulkAction) Execute(ctx context.Context, response *BulkActionRespon
 		return err
 	}
 	if created {
-		err = fragments.SaveDataSet(action.Spec, action.p)
+		err = fragments.SaveDataSet(action.Spec, action.s)
 		if err != nil {
 			log.Printf("Unable to Save DataSet Fragment for %s\n", action.Spec)
 			return err
@@ -195,21 +194,21 @@ func (action BulkAction) Execute(ctx context.Context, response *BulkActionRespon
 		log.Printf("Incremented dataset %s ", action.Spec)
 	case "clear_orphans":
 		// clear triples
-		ok, err := ds.DropOrphans(ctx, action.p, action.wp)
+		ok, err := ds.DropOrphans(ctx, action.s)
 		if !ok || err != nil {
 			log.Printf("Unable to drop orphans for %s: %#v\n", action.Spec, err)
 			return err
 		}
 		log.Printf("Mark orphans and delete them for %s", action.Spec)
 	case "disable_index":
-		ok, err := ds.DropRecords(ctx, action.wp)
+		ok, err := ds.DropRecords(ctx, action.s)
 		if !ok || err != nil {
 			log.Printf("Unable to drop records for %s\n", action.Spec)
 			return err
 		}
 		log.Printf("remove dataset %s from the storage", action.Spec)
 	case "drop_dataset":
-		ok, err := ds.DropAll(ctx, action.wp)
+		ok, err := ds.DropAll(ctx, action.s)
 		if !ok || err != nil {
 			log.Printf("Unable to drop dataset %s", action.Spec)
 			return err
@@ -315,7 +314,7 @@ func (action *BulkAction) ESSave(response *BulkActionResponse, v1StylingIndexing
 		}
 	}
 
-	var r *elastic.BulkIndexRequest
+	var r *domain.StoreRequest
 	if v1StylingIndexing {
 		// cleanup the graph and sort rdf webresources
 		fb.GetSortedWebResources()
@@ -325,35 +324,48 @@ func (action *BulkAction) ESSave(response *BulkActionResponse, v1StylingIndexing
 			log.Printf("Unable to create index doc: %s", err)
 			return err
 		}
-		r, err = fragments.CreateESAction(indexDoc, action.HubID)
+		b, err := json.Marshal(indexDoc)
+		if err != nil {
+			return errors.Wrapf(err, "unable to marshal v1 indexDoc to json")
+		}
+
+		r = domain.NewStoreRequest().
+			ID(action.HubID).
+			Type("void_edmrecord").
+			Index(c.Config.ElasticSearch.IndexName).
+			Doc(string(b))
 		if err != nil {
 			log.Printf("Unable to create v1 es action: %s", err)
 			return err
 		}
+
+		// TODO POSTHOOK
 		// add to posthook worker from v1
-		subject := strings.TrimSuffix(action.NamedGraphURI, "/graph")
-		g := fb.Graph
-		ph := models.NewPostHookJob(g, action.Spec, false, subject)
-		if ph.Valid() {
-			action.wp.Submit(func() { models.ApplyPostHookJob(ph) })
-			//action.wp.Submit(func() { log.Println(ph.Subject) })
-		}
+		//subject := strings.TrimSuffix(action.NamedGraphURI, "/graph")
+		//g := fb.Graph
+		//ph := models.NewPostHookJob(g, action.Spec, false, subject)
+		//if ph.Valid() {
+		//action.wp.Submit(func() { models.ApplyPostHookJob(ph) })
+		////action.wp.Submit(func() { log.Println(ph.Subject) })
+		//}
 	} else {
 		// index the LoD Fragments
 		if c.Config.ElasticSearch.Fragments {
-			err = fb.IndexFragments(action.p)
+			err = fb.IndexFragments(action.s)
 			if err != nil {
 				return err
 			}
 		}
-
+		b, err := json.Marshal(fb.Doc())
+		if err != nil {
+			return errors.Wrapf(err, "unable to marshal fragments to json")
+		}
 		// index FragmentGraph
-		r = elastic.NewBulkIndexRequest().
+		r = domain.NewStoreRequest().
 			Index(c.Config.ElasticSearch.IndexName).
 			Type(fragments.DocType).
-			RetryOnConflict(3).
-			Id(action.HubID).
-			Doc(fb.Doc())
+			ID(action.HubID).
+			Doc(string(b))
 	}
 	if r == nil {
 		// todo add code back to create index doc
@@ -362,7 +374,7 @@ func (action *BulkAction) ESSave(response *BulkActionResponse, v1StylingIndexing
 	}
 
 	// submit the bulkIndexRequest for indexing
-	action.p.Add(r)
+	action.s.Add(r)
 
 	if c.Config.RDF.RDFStoreEnabled {
 		action.CreateRDFBulkRequest(response, fb.Graph)
@@ -389,8 +401,13 @@ func (action BulkAction) createFragmentBuilder(revision int) (*fragments.Fragmen
 	err := fb.ParseGraph(strings.NewReader(action.Graph), action.GraphMimeType)
 	if err != nil {
 		log.Printf("Unable to parse the graph: %s", err)
-		return fb, fmt.Errorf("Source RDF is not in format: %s", action.GraphMimeType)
+		return fb, errors.Wrapf(err, "Source RDF is not in format: %s", action.GraphMimeType)
 	}
+	_, err = fb.ResourceMap()
+	if err != nil {
+		return nil, errors.Wrapf(err, "unable to create resourceMap for builder")
+	}
+
 	return fb, nil
 }
 

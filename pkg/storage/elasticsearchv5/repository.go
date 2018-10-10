@@ -54,7 +54,7 @@ func (s Storage) Add(sr *domain.StoreRequest) error {
 		Type("void_edmrecord").
 		RetryOnConflict(3).
 		Id(sr.DocID).
-		Doc(sr.Doc)
+		Doc(sr.DataDoc)
 	s.p.Add(r)
 	return nil
 }
@@ -81,6 +81,7 @@ func createESClient() (*elastic.Client, error) {
 	}
 
 	if config.Config.ElasticSearch.HasAuthentication() {
+		stdlog.Println("setting authentication")
 		es := config.Config.ElasticSearch
 		options = append(options, elastic.SetBasicAuth(es.UserName, es.Password))
 	}

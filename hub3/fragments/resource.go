@@ -24,8 +24,8 @@ import (
 
 	c "github.com/delving/rapid-saas/config"
 	"github.com/delving/rapid-saas/hub3/index"
+	"github.com/delving/rapid-saas/pkg/engine"
 	r "github.com/kiivihal/rdf2go"
-	elastic "github.com/olivere/elastic"
 )
 
 const (
@@ -735,7 +735,7 @@ func (fg *FragmentGraph) NewGrouped() (*FragmentResource, error) {
 
 	// create the resource map
 	for _, fr := range fg.Resources {
-		log.Printf("%#v", fr.ID)
+		//log.Printf("%#v", fr.ID)
 		rm.resources[fr.ID] = fr
 	}
 
@@ -965,16 +965,16 @@ func (fe *FragmentEntry) GetXSDLabel() string {
 }
 
 // IndexFragments updates the Fragments for standalone indexing and adds them to the Elastic BulkProcessorService
-func (fb *FragmentBuilder) IndexFragments(p *elastic.BulkProcessor) error {
+func (fb *FragmentBuilder) IndexFragments(s engine.Service) error {
 	rm, err := fb.ResourceMap()
 	if err != nil {
 		return err
 	}
-	return IndexFragments(rm, fb.FragmentGraph(), p)
+	return IndexFragments(rm, fb.FragmentGraph(), s)
 }
 
 // IndexFragments updates the Fragments for standalone indexing and adds them to the Elastic BulkProcessorService
-func IndexFragments(rm *ResourceMap, fg *FragmentGraph, p *elastic.BulkProcessor) error {
+func IndexFragments(rm *ResourceMap, fg *FragmentGraph, s engine.Service) error {
 
 	for _, fr := range rm.Resources() {
 		fragments, err := fr.CreateFragments(fg)
@@ -982,7 +982,7 @@ func IndexFragments(rm *ResourceMap, fg *FragmentGraph, p *elastic.BulkProcessor
 			return err
 		}
 		for _, frag := range fragments {
-			err := frag.AddTo(p)
+			err := frag.AddTo(s)
 			if err != nil {
 				return err
 			}

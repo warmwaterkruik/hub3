@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/delving/rapid-saas/config"
+	"github.com/delving/rapid-saas/pkg/engine"
 	r "github.com/kiivihal/rdf2go"
-	elastic "github.com/olivere/elastic"
 )
 
 // CSVConvertor holds all values to convert a CSV to RDF
@@ -37,7 +37,7 @@ func NewCSVConvertor() *CSVConvertor {
 }
 
 // IndexFragments stores the fragments generated from the CSV into ElasticSearch
-func (con *CSVConvertor) IndexFragments(p *elastic.BulkProcessor, revision int) (int, int, error) {
+func (con *CSVConvertor) IndexFragments(s engine.Service, revision int) (int, int, error) {
 
 	fg := NewFragmentGraph()
 	fg.Meta = &Header{
@@ -66,7 +66,7 @@ func (con *CSVConvertor) IndexFragments(p *elastic.BulkProcessor, revision int) 
 
 		for _, frag := range frags {
 			frag.Meta.AddTags("csvUpload")
-			err := frag.AddTo(p)
+			err := frag.AddTo(s)
 			if err != nil {
 				return 0, 0, err
 			}

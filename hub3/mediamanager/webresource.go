@@ -23,7 +23,7 @@ import (
 	"path/filepath"
 
 	c "github.com/delving/rapid-saas/config"
-	elastic "github.com/olivere/elastic"
+	"github.com/delving/rapid-saas/pkg/engine"
 )
 
 const (
@@ -78,7 +78,7 @@ func checkDuplicate(path string, info os.FileInfo, err error) error {
 }
 
 // IndexWebResources reindexes all webresources
-func IndexWebResources(p *elastic.BulkProcessor) error {
+func IndexWebResources(s engine.Service) error {
 	err := filepath.Walk(c.Config.WebResource.WebResourceDir, printFile([]string{}))
 	if err != nil {
 		log.Println(err)

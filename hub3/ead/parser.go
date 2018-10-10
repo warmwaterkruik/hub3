@@ -16,9 +16,9 @@ import (
 
 	c "github.com/delving/rapid-saas/config"
 	"github.com/delving/rapid-saas/hub3/models"
+	"github.com/delving/rapid-saas/pkg/engine"
 	"github.com/go-chi/render"
 	proto "github.com/golang/protobuf/proto"
-	"github.com/olivere/elastic"
 )
 
 // ReadEAD reads an ead2002 XML from a path
@@ -37,7 +37,7 @@ func eadParse(src []byte) (*Cead, error) {
 	return ead, err
 }
 
-func ProcessUpload(r *http.Request, w http.ResponseWriter, spec string, p *elastic.BulkProcessor) (uint64, error) {
+func ProcessUpload(r *http.Request, w http.ResponseWriter, spec string, s engine.Service) (uint64, error) {
 
 	f, err := ioutil.TempFile(c.Config.EAD.CacheDir, "*")
 	defer f.Close()
@@ -107,15 +107,15 @@ func ProcessUpload(r *http.Request, w http.ResponseWriter, spec string, p *elast
 		w.Write(d)
 	}
 
-	if p != nil {
+	if s != nil {
 		go func() {
 			start := time.Now()
-			err := nl.ESSave(cfg, p)
+			err := nl.ESSave(cfg, s)
 			if err != nil {
 				log.Printf("Unable to save nodes; %s", err)
 			}
 
-			_, err = ds.DropOrphans(context.TODO(), p, nil)
+			_, err = ds.DropOrphans(context.TODO(), s)
 			if err != nil {
 				log.Printf("Unable to drop orphans; %s", err)
 			}

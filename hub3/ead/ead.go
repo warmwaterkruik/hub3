@@ -3,6 +3,7 @@ package ead
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"log"
@@ -13,7 +14,9 @@ import (
 
 	c "github.com/delving/rapid-saas/config"
 	"github.com/delving/rapid-saas/hub3/fragments"
-	"github.com/olivere/elastic"
+	"github.com/delving/rapid-saas/pkg/domain"
+	"github.com/delving/rapid-saas/pkg/engine"
+	"github.com/pkg/errors"
 )
 
 const pathSep string = "~"
@@ -134,9 +137,9 @@ func (nl *NodeList) Sparse() {
 }
 
 // ESSave saves the list of Archive Nodes to ElasticSearch
-func (nl *NodeList) ESSave(cfg *NodeConfig, p *elastic.BulkProcessor) error {
+func (nl *NodeList) ESSave(cfg *NodeConfig, s engine.Service) error {
 	for _, n := range nl.GetNodes() {
-		err := n.ESSave(cfg, p)
+		err := n.ESSave(cfg, s)
 		if err != nil {
 			return err
 		}
@@ -146,26 +149,30 @@ func (nl *NodeList) ESSave(cfg *NodeConfig, p *elastic.BulkProcessor) error {
 }
 
 // ESSave stores a Fragments and a FragmentGraph in ElasticSearch
-func (n *Node) ESSave(cfg *NodeConfig, p *elastic.BulkProcessor) error {
+func (n *Node) ESSave(cfg *NodeConfig, s engine.Service) error {
 	fg, rm, err := n.FragmentGraph(cfg)
 	if err != nil {
 		return err
 	}
-	r := elastic.NewBulkIndexRequest().
-		Index(c.Config.ElasticSearch.IndexName).
-		Type(fragments.DocType).
-		RetryOnConflict(3).
-		Id(fg.Meta.HubID).
-		Doc(fg)
-	p.Add(r)
+	b, err := json.Marshal(fg)
+	if err != nil {
+		return errors.Wrapf(err, "unable to marshal fragmentgraph to json")
+	}
 
-	err = fragments.IndexFragments(rm, fg, p)
+	r := domain.NewStoreRequest().
+		ID(fg.Meta.HubID).
+		Type(fragments.DocType).
+		Index(c.Config.ElasticSearch.IndexName).
+		Doc(string(b))
+	s.Add(r)
+
+	err = fragments.IndexFragments(rm, fg, s)
 	if err != nil {
 		return err
 	}
 
 	for _, n := range n.GetNodes() {
-		err := n.ESSave(cfg, p)
+		err := n.ESSave(cfg, s)
 		if err != nil {
 			return err
 		}

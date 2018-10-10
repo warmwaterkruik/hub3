@@ -18,7 +18,6 @@ package index
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -32,22 +31,6 @@ var (
 	processor *elastic.BulkProcessor
 	once      sync.Once
 )
-
-// BulkProcessor is an interface for oliver/elastice BulkProcessor.
-type BulkProcessor interface {
-	Start(ctx context.Context) error
-	Stop() error
-	Close() error
-	Stats() elastic.BulkProcessorStats
-	Add(request BulkableRequest)
-	Flush() error
-}
-
-// BulkableRequest is a generic interface to bulkable requests.
-type BulkableRequest interface {
-	fmt.Stringer
-	Source() ([]string, error)
-}
 
 // CreateBulkProcessor creates an Elastic BulkProcessorService
 func CreateBulkProcessor(ctx context.Context) *elastic.BulkProcessor {
@@ -73,7 +56,7 @@ func CreateBulkProcessorService() *elastic.BulkProcessorService {
 
 }
 
-func beforeFn(executionID int64, requests []BulkableRequest) {
+func beforeFn(executionID int64, requests []elastic.BulkableRequest) {
 	//log.Println("starting bulk.")
 }
 
@@ -105,22 +88,4 @@ func IndexingProcessor() *elastic.BulkProcessor {
 		processor = CreateBulkProcessor(ctx)
 	})
 	return processor
-}
-
-// BulkIndexStatistics returns access to statistics in an indexing snapshot
-func BulkIndexStatistics(p *elastic.BulkProcessor) elastic.BulkProcessorStats {
-	stats := p.Stats()
-	fmt.Printf("Number of times flush has been invoked: %d\n", stats.Flushed)
-	fmt.Printf("Number of times workers committed reqs: %d\n", stats.Committed)
-	fmt.Printf("Number of requests indexed            : %d\n", stats.Indexed)
-	fmt.Printf("Number of requests reported as created: %d\n", stats.Created)
-	fmt.Printf("Number of requests reported as updated: %d\n", stats.Updated)
-	fmt.Printf("Number of requests reported as success: %d\n", stats.Succeeded)
-	fmt.Printf("Number of requests reported as failed : %d\n", stats.Failed)
-
-	for i, w := range stats.Workers {
-		fmt.Printf("Worker %d: Number of requests queued: %d\n", i, w.Queued)
-		fmt.Printf("           Last response time       : %v\n", w.LastDuration)
-	}
-	return stats
 }

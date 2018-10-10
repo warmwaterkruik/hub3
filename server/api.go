@@ -33,7 +33,9 @@ import (
 	"github.com/delving/rapid-saas/hub3/harvesting"
 	"github.com/delving/rapid-saas/hub3/index"
 	"github.com/delving/rapid-saas/hub3/models"
-	"github.com/gammazero/workerpool"
+	"github.com/delving/rapid-saas/pkg/engine"
+	"github.com/delving/rapid-saas/pkg/storage/elasticsearchv5"
+	"github.com/delving/rapid-saas/pkg/storage/elasticsearchv6"
 	"github.com/gorilla/schema"
 	"github.com/kiivihal/rdf2go"
 
@@ -45,26 +47,34 @@ import (
 	"github.com/kiivihal/goharvest/oai"
 )
 
-var bp *elastic.BulkProcessor
-var wp *workerpool.WorkerPool
-var ctx context.Context
+var (
+	ctx context.Context
+	s   engine.Service
+)
 
 func init() {
-	var err error
 	ctx = context.Background()
-	bps := index.CreateBulkProcessorService()
-	bp, err = bps.Do(ctx)
-	if err != nil {
-		log.Fatalf("Unable to start BulkProcessor: %s", err)
+	switch c.Config.ElasticSearch.IndexV1 {
+	case true:
+		storage, err := elasticsearchv5.NewStorage()
+		if err != nil {
+			log.Fatalf("Unable to create storage: %#v", err)
+		}
+		s = engine.NewService(storage)
+	default:
+		storage, err := elasticsearchv6.NewStorage()
+		if err != nil {
+			log.Fatalf("Unable to create storage: %#v", err)
+		}
+		s = engine.NewService(storage)
 	}
-	wp = workerpool.New(10)
 }
 
 // APIErrorMessage contains the default API error messages
 type APIErrorMessage struct {
 	HTTPStatus int    `json:"code"`
 	Message    string `json:"type"`
-	Error      error  `json:error`
+	Error      error  `json:"error"`
 }
 
 // NewSingleFinalPathHostReverseProxy proxies QueryString of the request url to the target url
@@ -155,7 +165,7 @@ func predicateStats(w http.ResponseWriter, r *http.Request) {
 func eadUpload(w http.ResponseWriter, r *http.Request) {
 	spec := r.FormValue("spec")
 
-	_, err := ead.ProcessUpload(r, w, spec, bp)
+	_, err := ead.ProcessUpload(r, w, spec, s)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -218,7 +228,7 @@ func rdfUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if created {
-		err = fragments.SaveDataSet(form.Spec, bp)
+		err = fragments.SaveDataSet(form.Spec, s)
 		if err != nil {
 			log.Printf("Unable to Save DataSet Fragment for %s\n", form.Spec)
 			if err != nil {
@@ -241,6 +251,7 @@ func rdfUpload(w http.ResponseWriter, r *http.Request) {
 		form.TypePredicate,
 		form.IDSplitter,
 		ds.Revision,
+		s,
 	)
 
 	go func() {
@@ -259,14 +270,14 @@ func rdfUpload(w http.ResponseWriter, r *http.Request) {
 		//return
 		//}
 		//log.Printf("Saved %d fragments for %s", processed, upl.Spec)
-		processed, err := upl.SaveFragmentGraphs(bp)
+		processed, err := upl.SaveFragmentGraphs()
 		if err != nil {
 			log.Printf("Can't save records: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		log.Printf("Saved %d records for %s", processed, upl.Spec)
-		ds.DropOrphans(r.Context(), bp, nil)
+		ds.DropOrphans(r.Context(), s)
 	}()
 
 	render.Status(r, http.StatusCreated)
@@ -345,7 +356,8 @@ func skosSync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if created {
-		err = fragments.SaveDataSet(spec, bp)
+
+		err = fragments.SaveDataSet(spec, s)
 		if err != nil {
 			log.Printf("Unable to Save DataSet Fragment for %s\n", spec)
 			if err != nil {
@@ -389,7 +401,7 @@ func csvDelete(w http.ResponseWriter, r *http.Request) {
 		render.PlainText(w, r, err.Error())
 		return
 	}
-	_, err = ds.DropRecords(ctx, wp)
+	_, err = ds.DropRecords(ctx, s)
 	if err != nil {
 		log.Printf("Unable to delete all fragments for %s: %s", conv.DefaultSpec, err.Error())
 		render.Status(r, http.StatusBadRequest)
@@ -431,7 +443,7 @@ func csvUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if created {
-		err = fragments.SaveDataSet(conv.DefaultSpec, bp)
+		err = fragments.SaveDataSet(conv.DefaultSpec, s)
 		if err != nil {
 			log.Printf("Unable to Save DataSet Fragment for %s\n", conv.DefaultSpec)
 			if err != nil {
@@ -447,7 +459,7 @@ func csvUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	triplesCreated, rowsSeen, err := conv.IndexFragments(bp, ds.Revision)
+	triplesCreated, rowsSeen, err := conv.IndexFragments(s, ds.Revision)
 	conv.RowsProcessed = rowsSeen
 	conv.TriplesCreated = triplesCreated
 	log.Printf("Processed %d csv rows\n", rowsSeen)
@@ -456,7 +468,7 @@ func csvUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = ds.DropOrphans(ctx, bp, wp)
+	_, err = ds.DropOrphans(ctx, s)
 	if err != nil {
 		render.PlainText(w, r, err.Error())
 		return
@@ -493,7 +505,7 @@ func bulkSyncCancel(w http.ResponseWriter, r *http.Request) {
 // bulkApi receives bulkActions in JSON form (1 per line) and processes them in
 // ingestion pipeline.
 func bulkAPI(w http.ResponseWriter, r *http.Request) {
-	response, err := hub3.ReadActions(ctx, r.Body, bp, wp)
+	response, err := hub3.ReadActions(ctx, r.Body, s)
 	if err != nil {
 		log.Println("Unable to read actions")
 		errR := ErrRender(err)
@@ -863,7 +875,7 @@ func deleteDataset(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Dataset is not found: %s", spec)
 		return
 	}
-	ok, err := ds.DropAll(ctx, wp)
+	ok, err := ds.DropAll(ctx, s)
 	if !ok || err != nil {
 		render.Status(r, http.StatusBadRequest)
 		log.Printf("Unable to delete request because: %s", err)
@@ -895,7 +907,7 @@ func createDataSet(w http.ResponseWriter, r *http.Request) {
 		var created bool
 		ds, created, err = models.CreateDataSet(spec)
 		if created {
-			err = fragments.SaveDataSet(spec, bp)
+			err = fragments.SaveDataSet(spec, s)
 		}
 		if err != nil {
 			render.Status(r, http.StatusBadRequest)

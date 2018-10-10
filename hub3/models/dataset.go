@@ -25,7 +25,7 @@ import (
 	c "github.com/delving/rapid-saas/config"
 	"github.com/delving/rapid-saas/hub3/fragments"
 	"github.com/delving/rapid-saas/hub3/index"
-	w "github.com/gammazero/workerpool"
+	"github.com/delving/rapid-saas/pkg/engine"
 
 	elastic "github.com/olivere/elastic"
 )
@@ -203,9 +203,9 @@ func (ds DataSet) Save() error {
 }
 
 // Delete deletes the DataSet from BoltDB
-func (ds DataSet) Delete(ctx context.Context, wp *w.WorkerPool) error {
+func (ds DataSet) Delete(ctx context.Context, s engine.Service) error {
 	if c.Config.ElasticSearch.Enabled || c.Config.RDF.RDFStoreEnabled {
-		_, err := ds.DropAll(ctx, wp)
+		_, err := ds.DropAll(ctx, s)
 		return err
 	}
 	return orm.DeleteStruct(&ds)
@@ -489,7 +489,7 @@ func (ds DataSet) deleteAllGraphs() (bool, error) {
 
 // CreateDeletePostHooks scrolls through the elasticsearch index and adds entries
 // to be delete to the PostHook workerpool.
-func CreateDeletePostHooks(ctx context.Context, q elastic.Query, wp *w.WorkerPool) error {
+func CreateDeletePostHooks(ctx context.Context, q elastic.Query, s engine.Service) error {
 	index.ESClient().Flush(c.Config.ElasticSearch.IndexName)
 	time.Sleep(1500 * time.Millisecond)
 	scroll := index.ESClient().Scroll().
@@ -522,12 +522,13 @@ func CreateDeletePostHooks(ctx context.Context, q elastic.Query, wp *w.WorkerPoo
 			revision := item[c.Config.ElasticSearch.RevisionKey]
 			log.Printf("ph queue for %s with revision %f", spec, revision)
 			if id != nil {
-				ds := string(spec.(string))
-				uri := string(id.(string))
-				ph := NewPostHookJob(nil, ds, true, uri)
-				if ph.Valid() {
-					wp.Submit(func() { ApplyPostHookJob(ph) })
-				}
+				// TODO PostHook enable again
+				//ds := string(spec.(string))
+				//uri := string(id.(string))
+				//ph := NewPostHookJob(nil, ds, true, uri)
+				//if ph.Valid() {
+				//wp.Submit(func() { ApplyPostHookJob(ph) })
+				//}
 			}
 		}
 	}
@@ -549,7 +550,7 @@ func (ds DataSet) validForPostHook() bool {
 }
 
 // DeleteIndexOrphans deletes all the Orphaned records from the Search Index linked to this dataset
-func (ds DataSet) deleteIndexOrphans(ctx context.Context, wp *w.WorkerPool) (int, error) {
+func (ds DataSet) deleteIndexOrphans(ctx context.Context, s engine.Service) (int, error) {
 	q := elastic.NewBoolQuery()
 	q = q.MustNot(elastic.NewMatchQuery(c.Config.ElasticSearch.RevisionKey, ds.Revision))
 	q = q.Must(elastic.NewTermQuery(c.Config.ElasticSearch.SpecKey, ds.Spec))
@@ -562,8 +563,8 @@ func (ds DataSet) deleteIndexOrphans(ctx context.Context, wp *w.WorkerPool) (int
 		log.Print("Orphan wait timer expired")
 
 		// enqueue posthooks first
-		if ds.validForPostHook() && wp != nil {
-			err := CreateDeletePostHooks(ctx, q, wp)
+		if ds.validForPostHook() {
+			err := CreateDeletePostHooks(ctx, q, s)
 			if err != nil {
 				logger.Errorf("unable to create delete posthooks: %#v", err)
 				//return 0, err
@@ -592,16 +593,17 @@ func (ds DataSet) deleteIndexOrphans(ctx context.Context, wp *w.WorkerPool) (int
 }
 
 // DeleteAllIndexRecords deletes all the records from the Search Index linked to this dataset
-func (ds DataSet) deleteAllIndexRecords(ctx context.Context, wp *w.WorkerPool) (int, error) {
+func (ds DataSet) deleteAllIndexRecords(ctx context.Context, s engine.Service) (int, error) {
 	q := elastic.NewTermQuery(c.Config.ElasticSearch.SpecKey, ds.Spec)
 	logger.Infof("%#v", q)
-	if ds.validForPostHook() {
-		err := CreateDeletePostHooks(ctx, q, wp)
-		if err != nil {
-			logger.Errorf("unable to create delete posthooks: %#v", err)
-			return 0, err
-		}
-	}
+	// TODO POSTHOOK
+	//if ds.validForPostHook() {
+	//err := CreateDeletePostHooks(ctx, q, wp)
+	//if err != nil {
+	//logger.Errorf("unable to create delete posthooks: %#v", err)
+	//return 0, err
+	//}
+	//}
 	res, err := index.ESClient().DeleteByQuery().
 		Index(c.Config.ElasticSearch.IndexName).
 		Query(q).
@@ -619,9 +621,9 @@ func (ds DataSet) deleteAllIndexRecords(ctx context.Context, wp *w.WorkerPool) (
 }
 
 //DropOrphans removes all records of different revision that the current from the attached datastores
-func (ds DataSet) DropOrphans(ctx context.Context, p *elastic.BulkProcessor, wp *w.WorkerPool) (bool, error) {
+func (ds DataSet) DropOrphans(ctx context.Context, s engine.Service) (bool, error) {
 	ok := true
-	err := p.Flush()
+	err := s.Flush()
 	if err != nil {
 		log.Printf("Unable to Flush ElasticSearch index before deleting orphans.")
 		return false, err
@@ -635,7 +637,7 @@ func (ds DataSet) DropOrphans(ctx context.Context, p *elastic.BulkProcessor, wp 
 		}
 	}
 	if c.Config.ElasticSearch.Enabled {
-		_, err = ds.deleteIndexOrphans(ctx, wp)
+		_, err = ds.deleteIndexOrphans(ctx, s)
 		if err != nil {
 			log.Printf("Unable to remove RDF orphan graphs from spec %s: %s", ds.Spec, err)
 			return false, err
@@ -645,7 +647,7 @@ func (ds DataSet) DropOrphans(ctx context.Context, p *elastic.BulkProcessor, wp 
 }
 
 // DropRecords Drops all records linked to the dataset from the storage layers
-func (ds DataSet) DropRecords(ctx context.Context, wp *w.WorkerPool) (bool, error) {
+func (ds DataSet) DropRecords(ctx context.Context, s engine.Service) (bool, error) {
 	var err error
 	ok := true
 	if c.Config.RDF.RDFStoreEnabled {
@@ -657,7 +659,7 @@ func (ds DataSet) DropRecords(ctx context.Context, wp *w.WorkerPool) (bool, erro
 	}
 	// todo add deleting all records from elastic search
 	if c.Config.ElasticSearch.Enabled {
-		_, err = ds.deleteAllIndexRecords(ctx, wp)
+		_, err = ds.deleteAllIndexRecords(ctx, s)
 		if err != nil {
 			logger.Errorf("Unable to drop all index records for %s: %#v", ds.Spec, err)
 			return false, err
@@ -667,8 +669,8 @@ func (ds DataSet) DropRecords(ctx context.Context, wp *w.WorkerPool) (bool, erro
 }
 
 // DropAll drops the dataset from the Rapid storages completely (BoltDB, Triple Store, Search Index)
-func (ds DataSet) DropAll(ctx context.Context, wp *w.WorkerPool) (bool, error) {
-	ok, err := ds.DropRecords(ctx, wp)
+func (ds DataSet) DropAll(ctx context.Context, s engine.Service) (bool, error) {
+	ok, err := ds.DropRecords(ctx, s)
 	if !ok || err != nil {
 		logger.Errorf("Unable to drop all records for spec %s: %#v", ds.Spec, err)
 		return ok, err
