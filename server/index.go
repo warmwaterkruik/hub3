@@ -2,15 +2,11 @@ package server
 
 import (
 	"fmt"
-	"net/http"
 	"net/url"
 
 	c "github.com/delving/rapid/config"
 
-	"github.com/delving/rapid-saas/hub3/index"
 	"github.com/go-chi/chi"
-	"github.com/go-chi/render"
-	"github.com/labstack/gommon/log"
 )
 
 type IndexResource struct{}
@@ -19,14 +15,14 @@ func (rs IndexResource) Routes() chi.Router {
 	r := chi.NewRouter()
 
 	//r.Get("/stats", rs.Get) // GET
-	r.Get("/indexes", func(w http.ResponseWriter, r *http.Request) {
-		indexes, err := index.ListIndexes()
-		if err != nil {
-			log.Print(err)
-		}
-		render.PlainText(w, r, fmt.Sprint("indexes:", indexes))
-		return
-	})
+	//r.Get("/indexes", func(w http.ResponseWriter, r *http.Request) {
+	//indexes, err := index.ListIndexes()
+	//if err != nil {
+	//log.Print(err)
+	//}
+	//render.PlainText(w, r, fmt.Sprint("indexes:", indexes))
+	//return
+	//})
 	// Anything we don't do in Go, we pass to the old platform
 	es, _ := url.Parse(c.Config.ElasticSearch.Urls[0])
 	es.Path = fmt.Sprintf("/%s/", c.Config.ElasticSearch.IndexName)

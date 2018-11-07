@@ -264,7 +264,7 @@ func Start(buildInfo *c.BuildVersionInfo) {
 	log.Printf("Using port: %d", c.Config.Port)
 	err := http.ListenAndServe(fmt.Sprintf(":%d", c.Config.Port), n)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("FATAL error restarting the service: %#v", err)
 	}
 	// TODO: graceful shutdown with flushing and closing connections.
 	//// Start the server

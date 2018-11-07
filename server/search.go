@@ -459,7 +459,6 @@ func getSearchRecord(w http.ResponseWriter, r *http.Request) {
 			render.PlainText(w, r, err.Error())
 			return
 		}
-
 	}
 
 	switch r.URL.Query().Get("format") {
@@ -484,6 +483,7 @@ func getSearchRecord(w http.ResponseWriter, r *http.Request) {
 	default:
 		render.JSON(w, r, record)
 	}
+
 	return
 }
 

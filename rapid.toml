@@ -30,8 +30,8 @@ revisionKey = "meta.revision"
 # Key to use for finding the tentant or orgID key. Default meta.orgID
 orgIDKey = "meta.orgID"
 # username and password for packx security
-userName = ""
-password = ""
+#userName = "elastic"
+#password = "changeme"
 # configuration for MimimumShouldMatch
 minimumShouldMatch = "2<70%"
 
@@ -54,16 +54,17 @@ sentrydsn = ""
 
 [rdf]
 # Enable storing of the RDF records in the triple store specified in sparqlUpdatePath (default: false)
-rdfStoreEnabled = false
+rdfStoreEnabled = true
 # the fully qualified URL including the port
-sparqlHost = "http://localhost:3030"
+#sparqlHost = "http://localhost:3030"
+sparqlHost = "http://localhost:7200"
 # the path to the SPARQL endpoint. A '%s' can be inserted in the path to be replaced with the orgId.
 #sparqlPath = "/bigdata/namespace/%s/sparql"
-sparqlPath = "/%s/sparql"
+sparqlPath = "/repositories/%s"
 # sparqlUpdate path is the path to the write endpoint. A '%s' can be inserted in the path to be replaced with the orgId.
-sparqlUpdatePath = "/%s/update"
+sparqlUpdatePath = "/repositories/%s/statements"
 # dataPath is the path to the GraphStore Protocol endpoint
-dataPath = "/%s/data"
+dataPath = "/repositories/%s/rdf-graphs/"
 # A list of RDF entry points. 
 routedEntryPoints = ["http://localhost:3000"]
 # The base url used for minting RDF URI's

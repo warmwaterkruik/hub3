@@ -275,7 +275,7 @@ func listGetRecords(ccmd *cobra.Command, args []string) {
 // listRecords writes all Records to a file
 func listRecords(ccmd *cobra.Command, args []string) {
 	req := (&oai.Request{
-		BaseURL:        url,
+		BaseURL:        strings.Replace(url, "%21", "!", -1),
 		Verb:           "ListRecords",
 		Set:            spec,
 		MetadataPrefix: prefix,

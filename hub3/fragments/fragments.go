@@ -259,8 +259,7 @@ func (f Fragment) AddTo(s engine.Service) error {
 	if err != nil {
 		return err
 	}
-	s.Add(cbr)
-	return nil
+	return s.Add(cbr)
 }
 
 //// GetLabel retrieves the XSD label of the ObjectXSDType

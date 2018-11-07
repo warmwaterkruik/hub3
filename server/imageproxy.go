@@ -65,13 +65,13 @@ func serveProxyImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resp, err := p.Client.Get(req.String())
+	defer resp.Body.Close()
 	if err != nil {
 		msg := fmt.Sprintf("error fetching remote image: %v", err)
 		log.Print(msg)
 		http.Error(w, msg, http.StatusInternalServerError)
 		return
 	}
-	defer resp.Body.Close()
 
 	//cached := resp.Header.Get(httpcache.XFromCache)
 	//if p.Verbose {

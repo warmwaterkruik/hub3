@@ -97,6 +97,17 @@ WHERE {
 	?s ?p ?o .
 	}
 };
+
+# tag: 4LevelContext
+SELECT * WHERE {
+    BIND(<{{.SubjectURI}}> as ?s)
+    GRAPH <{{.NamedGraph}}>
+	{?s ?p ?o}
+	OPTIONAL { ?o ?p2 ?o2 ;
+	OPTIONAL {?o2 ?p3 ?o3 ;
+	OPTIONAL {?o3 ?p4 ?o4 ;
+    }}}}
+    LIMIT {.Limit}
 `
 
 var queryBank sparql.Bank
@@ -151,9 +162,11 @@ func UpdateViaSparql(update string) []error {
 		Retry(3, 4*time.Second, http.StatusBadRequest, http.StatusInternalServerError).
 		End()
 	if errs != nil {
-		log.Fatal(errs)
+		return errs
 	}
-	if resp.StatusCode != 200 && resp.StatusCode != 201 {
+	switch resp.StatusCode {
+	case 200, 201, 204:
+	default:
 		log.Println(body)
 		log.Println(resp)
 		log.Printf("unable to store sparqlUpdate: %s", update)

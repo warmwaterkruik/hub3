@@ -1,9 +1,9 @@
 version: '3'
 services:
-  elasticsearch:
+  elasticsearch64:
     image: docker.elastic.co/elasticsearch/elasticsearch:6.4.0
     #image: docker.elastic.co/elasticsearch/elasticsearch:5.6.12
-    container_name: elasticsearch6
+    container_name: elasticsearch64
     ports:
       - "9200:9200"
       #- "9300:9300"

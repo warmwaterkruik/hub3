@@ -49,7 +49,6 @@ func sparqlProxy(w http.ResponseWriter, r *http.Request) {
 	if !strings.Contains(strings.ToLower(query), "limit ") {
 		query = fmt.Sprintf("%s LIMIT 25", query)
 	}
-	log.Info(query)
 	resp, statusCode, contentType, err := runSparqlQuery(query)
 	if err != nil {
 		render.Status(r, http.StatusBadRequest)
@@ -68,11 +67,13 @@ func sparqlProxy(w http.ResponseWriter, r *http.Request) {
 // runSparqlQuery sends a SPARQL query to the SPARQL-endpoint specified in the configuration
 func runSparqlQuery(query string) (body []byte, statusCode int, contentType string, err error) {
 	log.Debugf("Sparql Query: %s", query)
-	req, err := http.NewRequest("Get", c.Config.GetSparqlEndpoint(""), nil)
+	req, err := http.NewRequest("GET", c.Config.GetSparqlEndpoint(""), nil)
 	if err != nil {
 		log.Errorf("Unable to create sparql request %s", err)
+		return
 	}
-	req.Header.Set("Accept", "application/sparql-results+json")
+	req.Header.Set("ACCEPT", "application/sparql-results+json")
+	req.Header.Set("CONTENT_TYPE", "application/x-www-form-urlencoded")
 	q := req.URL.Query()
 	q.Add("query", query)
 	req.URL.RawQuery = q.Encode()

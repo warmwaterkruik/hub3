@@ -738,7 +738,6 @@ func (fg *FragmentGraph) NewGrouped() (*FragmentResource, error) {
 		//log.Printf("%#v", fr.ID)
 		rm.resources[fr.ID] = fr
 	}
-
 	// inlining check
 
 	// set the inlines
