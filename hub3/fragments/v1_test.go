@@ -74,7 +74,7 @@ var _ = Describe("V1", func() {
 				g, err := NewGraphFromTurtle(turtle)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(g).ToNot(BeNil())
-				Expect(g.Len()).To(Equal(65))
+				Expect(g.Len()).To(Equal(67))
 			})
 
 			It("Should throw an error when receiving invalid RDF", func() {
@@ -187,6 +187,14 @@ var _ = Describe("V1", func() {
 				Expect(triple.Subject.(*r.Resource).RawValue()).To(HaveSuffix("F900893"))
 			})
 
+			It("should remove derivatives from BlankNodes when WebResources are urns", func() {
+				fb, err := testDataGraph(false)
+				Expect(err).ToNot(HaveOccurred())
+				graphLength := fb.Graph.Len()
+				Expect(graphLength).To(Equal(65))
+
+			})
+
 			It("should rerender blanknodes in cleaned up graph", func() {
 				fb, err := testDataGraph(false)
 				Expect(err).ToNot(HaveOccurred())
@@ -198,7 +206,7 @@ var _ = Describe("V1", func() {
 
 				wr := fb.GetSortedWebResources()
 				Expect(wr).ToNot(BeEmpty())
-				Expect(fb.Graph.Len()).To(Equal(69))
+				Expect(fb.Graph.Len()).To(Equal(70))
 
 				// have brabantcloud resource
 				bType := r.NewResource("http://schemas.delving.eu/nave/terms/BrabantCloudResource")

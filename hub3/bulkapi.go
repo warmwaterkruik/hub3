@@ -30,6 +30,7 @@ import (
 	"github.com/delving/rapid-saas/hub3/models"
 	"github.com/gammazero/workerpool"
 	r "github.com/kiivihal/rdf2go"
+
 	//elastic "github.com/olivere/elastic"
 	"github.com/parnurzeal/gorequest"
 	elastic "gopkg.in/olivere/elastic.v5"
@@ -306,13 +307,6 @@ func (action *BulkAction) ESSave(response *BulkActionResponse, v1StylingIndexing
 	fb, err := action.createFragmentBuilder(response.SpecRevision)
 	if err != nil {
 		return err
-	}
-	// get remote webresources
-	if c.Config.WebResource.ResolveRemoteWebResources {
-		err = fb.ResolveWebResources()
-		if err != nil {
-			return err
-		}
 	}
 	// cleanup the graph and sort rdf webresources
 	fb.GetSortedWebResources()

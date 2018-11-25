@@ -25,6 +25,7 @@ import (
 
 	c "github.com/delving/rapid-saas/config"
 	r "github.com/kiivihal/rdf2go"
+
 	//"github.com/olivere/elastic"
 	elastic "gopkg.in/olivere/elastic.v5"
 
@@ -232,6 +233,7 @@ func (fb *FragmentBuilder) GetUrns() []string {
 // ResolveWebResources retrieves RDF graph from remote MediaManager
 // Only RDF Resources that start with 'urn:' are currently supported
 func (fb *FragmentBuilder) ResolveWebResources() error {
+	// replace with err group
 	errChan := make(chan error)
 
 	urns := fb.GetUrns()
@@ -242,55 +244,65 @@ func (fb *FragmentBuilder) ResolveWebResources() error {
 	for i := 0; i < totalUrns; i++ {
 		select {
 		case err := <-errChan:
-			log.Printf("Error resolving webresources for: %v: %v\n", urns, err)
-			return err
+			if err != nil {
+				log.Printf("Error resolving webresources for: %v: %#v\n", urns, err)
+				return err
+			}
 		}
 	}
 	return nil
 }
 
-// GetSortedWebResources returns a list of subjects sorted by nave:resourceSortOrder.
-// WebResources without a sortKey will appended in order they are found to the end of the list.
-func (fb *FragmentBuilder) GetSortedWebResources() []ResourceSortOrder {
-	resources := make(map[string]int)
-	cleanGraph := r.NewGraph("")
-
-	hasUrns := len(fb.GetUrns()) > 0
-
+// CleanWebResourceGraph remove mapped webresources when urns are used for WebResource Subjects
+func (fb *FragmentBuilder) CleanWebResourceGraph(hasUrns bool) (*r.Graph, map[string]ResourceSortOrder, []r.Term) {
+	resources := make(map[string]ResourceSortOrder)
 	aggregates := []r.Term{}
 
-	graphType := fb.Graph.One(
-		nil,
-		r.NewResource("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"),
-		r.NewResource("http://www.openarchives.org/ore/terms/Aggregation"),
-	)
-	subj := r.NewResource("")
-	if graphType != nil {
-		subj = graphType.Subject
-	}
+	cleanGraph := r.NewGraph("")
 
+	seen := 0
 	for triple := range fb.Graph.IterTriples() {
+		seen++
 		s := triple.Subject.String()
 		p := triple.Predicate.String()
+		subjectIsBNode := false
+
+		switch triple.Subject.(type) {
+		case *r.BlankNode:
+			subjectIsBNode = true
+		}
+		if hasUrns && strings.HasSuffix(s, "__>") {
+			continue
+		}
 		switch p {
 		case GetNaveField("resourceSortOrder").String():
 			rawInt := triple.Object.(*r.Literal).RawValue()
 			i, err := strconv.Atoi(rawInt)
-			if err != nil {
-				resources[s] = 1000
-			} else {
-				resources[s] = i
+			order := 1000
+			if err == nil {
+				order = i
 			}
-			cleanGraph.Add(triple)
+			resources[s] = ResourceSortOrder{
+				Key:   s,
+				Value: order,
+			}
+			//cleanGraph.Add(triple)
+			continue
 		case r.NewResource("http://www.w3.org/1999/02/22-rdf-syntax-ns#type").String():
 			o := triple.Object.String()
 			if o == GetEDMField("WebResource").String() {
 				if !strings.HasSuffix(s, "__>") {
+					cleanGraph.Add(triple)
+					//if hasUrns {
+					//continue
+					//}
 					_, ok := resources[s]
 					if !ok {
-						resources[s] = 1000
+						resources[s] = ResourceSortOrder{
+							Key:   s,
+							Value: 1000,
+						}
 					}
-					cleanGraph.Add(triple)
 				}
 			} else if strings.HasPrefix(o, "<http://schemas.delving.eu/nave/terms/") {
 				aggregates = append(aggregates, triple.Subject)
@@ -299,39 +311,79 @@ func (fb *FragmentBuilder) GetSortedWebResources() []ResourceSortOrder {
 				cleanGraph.Add(triple)
 			}
 		case GetEDMField("hasView").String():
-			break
+			continue
 		case GetEDMField("isShownBy").String(), GetEDMField("object").String():
-			if hasUrns {
-				break
+			continue
+		case GetNaveField("thumbnail").String(), GetNaveField("smallThumbnail").String(), GetNaveField("largeThumbnail").String():
+			if hasUrns && subjectIsBNode {
+				continue
 			}
-			fallthrough
-		//g.Remove(triple)
-		//case GetNaveField("thumbSmall").String(), GetNaveField("thumbnail").String(), GetNaveField("thumbLarge").String():
-		//fb.Graph.Remove(triple)
-		//case GetNaveField("deepZoomUrl").String():
-		//fb.Graph.Remove(triple)
+			cleanGraph.Add(triple)
+		case GetNaveField("thumbSmall").String(), GetNaveField("thumbnail").String(), GetNaveField("thumbLarge").String():
+			if hasUrns && subjectIsBNode {
+				continue
+			}
+			cleanGraph.Add(triple)
+		case GetNaveField("deepZoomUrl").String():
+			if hasUrns && subjectIsBNode {
+				continue
+			}
+			cleanGraph.Add(triple)
 		default:
 			cleanGraph.Add(triple)
 		}
 
 	}
-	var ss []ResourceSortOrder
-	for k, v := range resources {
-		ss = append(ss, ResourceSortOrder{k, v})
+
+	return cleanGraph, resources, aggregates
+}
+
+// GetSortedWebResources returns a list of subjects sorted by nave:resourceSortOrder.
+// WebResources without a sortKey will appended in order they are found to the end of the list.
+func (fb *FragmentBuilder) GetSortedWebResources() []ResourceSortOrder {
+	hasUrns := len(fb.GetUrns()) > 0
+
+	subj := r.NewResource(fb.fg.Meta.GetEntryURI())
+
+	// get remote webresources
+	if c.Config.WebResource.ResolveRemoteWebResources {
+		err := fb.ResolveWebResources()
+		if err != nil {
+			log.Printf("err: %#v", err)
+			//return err
+		}
 	}
 
-	// sort by key
+	cleanGraph, resources, aggregates := fb.CleanWebResourceGraph(hasUrns)
+
+	var ss []ResourceSortOrder
+	for _, v := range resources {
+		ss = append(ss, v)
+	}
+
+	keySort := ss
+	sort.Slice(keySort, func(i, j int) bool {
+		return ss[i].Key < ss[j].Key
+	})
+	lexSort := make(map[string]int)
+	for i, key := range keySort {
+		lexSort[key.Key] = i + 1
+	}
+
+	for i, s := range ss {
+		if s.Value == 1000 {
+			ss[i].Value = lexSort[s.Key]
+		}
+
+	}
+	// sort by Value
 	sort.Slice(ss, func(i, j int) bool {
 		return ss[i].Value < ss[j].Value
 	})
 
-	// replace 1000 with incremental number
-	for i, s := range ss {
-		if s.Value == 1000 {
-			ss[i].Value = i + 1
-		}
+	for _, s := range ss {
 		if len(subj.String()) > 0 {
-			if i == 0 && hasUrns {
+			if s.Value == 1 && hasUrns {
 				fb.AddDefaults(r.NewResource(s.CleanKey()), subj, cleanGraph)
 			}
 			hasView := r.NewTriple(
@@ -340,6 +392,19 @@ func (fb *FragmentBuilder) GetSortedWebResources() []ResourceSortOrder {
 				r.NewResource(s.CleanKey()),
 			)
 			cleanGraph.Add(hasView)
+
+			sortOrder := r.NewTriple(
+				r.NewResource(s.CleanKey()),
+				GetEDMField("resourceSortOrder"),
+				r.NewLiteral(fmt.Sprintf("%d", s.Value)),
+			)
+
+			//log.Printf("sortOrder: %#v", s)
+			//log.Printf("sort triple: %#v", sortOrder.String())
+			// add resourceSortOrder back
+			cleanGraph.Add(sortOrder)
+		} else {
+			log.Printf("subject not found: %s", subj)
 		}
 	}
 	// add ore:aggregates
@@ -352,6 +417,7 @@ func (fb *FragmentBuilder) GetSortedWebResources() []ResourceSortOrder {
 	}
 
 	fb.Graph = cleanGraph
+
 	return ss
 }
 
@@ -378,6 +444,11 @@ func (fb *FragmentBuilder) GetObject(s r.Term, p r.Term) r.Term {
 // AddDefaults add default thumbnail fields to a edm:WebResource
 func (fb *FragmentBuilder) AddDefaults(wr r.Term, s r.Term, g *r.Graph) {
 	isShownBy := fb.GetObject(wr, GetNaveField("thumbLarge"))
+	if isShownBy == nil {
+		//ld, _ := g.GenerateJSONLD()
+		log.Printf("should find thumbLarge: %s, %s \n %s", wr.String(), s.String(), "")
+		time.Sleep(100 * time.Second)
+	}
 	if isShownBy != nil {
 		g.AddTriple(s, GetEDMField("isShownBy"), isShownBy)
 	}
@@ -393,11 +464,22 @@ func (fb *FragmentBuilder) GetRemoteWebResource(urn string, orgID string, errCha
 	if strings.HasPrefix(urn, "urn:") {
 		url := fb.MediaManagerURL(urn, orgID)
 		request := gorequest.New()
+		//log.Printf("webresource url: %s", url)
 		resp, _, errs := request.Get(url).End()
 		if errs != nil {
+			for err := range errs {
+				log.Printf("err: %#v", err)
+			}
 			errChan <- errs[0]
 			return
 		}
+		defer resp.Body.Close()
+		if resp.StatusCode != 200 {
+			log.Printf("urn not found: %s?format=plain", url)
+			errChan <- nil
+			return
+		}
+		defer resp.Body.Close()
 		err := fb.Graph.Parse(resp.Body, "text/turtle")
 		errChan <- err
 		return
@@ -450,6 +532,15 @@ func (fb *FragmentBuilder) SetResourceLabels() error {
 	return nil
 }
 
+func fieldsContains(s []*IndexEntry, e *IndexEntry) bool {
+	for _, a := range s {
+		if a.Raw == e.Raw {
+			return true
+		}
+	}
+	return false
+}
+
 // CreateV1IndexDoc creates a map that can me marshaled to json
 func CreateV1IndexDoc(fb *FragmentBuilder) (map[string]interface{}, error) {
 	indexDoc := make(map[string]interface{})
@@ -460,7 +551,12 @@ func CreateV1IndexDoc(fb *FragmentBuilder) (map[string]interface{}, error) {
 		return indexDoc, err
 	}
 
+	var triples []*r.Triple
 	for t := range fb.Graph.IterTriples() {
+		triples = append(triples, t)
+	}
+
+	for _, t := range triples {
 		searchLabel, err := GetFieldKey(t)
 		if err != nil {
 			return indexDoc, err
@@ -474,6 +570,10 @@ func CreateV1IndexDoc(fb *FragmentBuilder) (map[string]interface{}, error) {
 		entry, err := fb.CreateV1IndexEntry(t)
 		if err != nil {
 			return indexDoc, err
+		}
+		if fieldsContains(fields, entry) {
+			fb.Graph.Remove(t)
+			continue
 		}
 		indexDoc[searchLabel] = append(fields, entry)
 	}
@@ -489,6 +589,12 @@ func CreateV1IndexDoc(fb *FragmentBuilder) (map[string]interface{}, error) {
 	indexDoc["hubID"] = fb.fg.Meta.GetHubID()
 	indexDoc["system"] = NewSystem(indexDoc, fb)
 	indexDoc["legacy"] = NewLegacy(indexDoc, fb)
+
+	//_, ok := indexDoc["edm_isShownBy"]
+	//if !ok {
+	//log.Printf("indexdoc: %#v", indexDoc["system"])
+	//time.Sleep(10 * time.Second)
+	//}
 	return indexDoc, nil
 }
 

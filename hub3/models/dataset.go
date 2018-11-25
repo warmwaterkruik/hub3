@@ -26,6 +26,7 @@ import (
 	"github.com/delving/rapid-saas/hub3/fragments"
 	"github.com/delving/rapid-saas/hub3/index"
 	w "github.com/gammazero/workerpool"
+
 	//elastic "github.com/olivere/elastic"
 	elastic "gopkg.in/olivere/elastic.v5"
 )
@@ -522,8 +523,8 @@ func (ds DataSet) deleteIndexOrphans(ctx context.Context, wp *w.WorkerPool) (int
 		}
 	}
 
-	// block for 2 seconds to allow cluster to be in sync
-	timer := time.NewTimer(time.Second * 2)
+	// block for 10 seconds to allow cluster to be in sync
+	timer := time.NewTimer(time.Second * 10)
 	<-timer.C
 	log.Print("Timer expired")
 
@@ -623,7 +624,7 @@ func (ds DataSet) DropAll(ctx context.Context, wp *w.WorkerPool) (bool, error) {
 	}
 	err = orm.DeleteStruct(&ds)
 	if err != nil {
-		logger.Errorf("Unable to delete dataset %s from storage")
+		logger.Errorf("Unable to delete dataset %s from storage", ds.Spec)
 		return false, err
 	}
 	return ok, err
