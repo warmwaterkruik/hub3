@@ -122,6 +122,7 @@ func ReadActions(ctx context.Context, r io.Reader, p *elastic.BulkProcessor, wp 
 	for scanner.Scan() {
 		line = scanner.Bytes()
 		var action BulkAction
+		//log.Printf("action: \n%s\n", line)
 		err := json.Unmarshal(line, &action)
 		if err != nil {
 			response.JSONErrors++
