@@ -478,7 +478,6 @@ func CreateDeletePostHooks(ctx context.Context, q elastic.Query, wp *w.WorkerPoo
 			}
 			id := item["entryURI"]
 			spec := item[c.Config.ElasticSearch.SpecKey]
-			// TODO replace with meta header key when migrated to v2 style indexing
 			revision := item[c.Config.ElasticSearch.RevisionKey]
 			log.Printf("ph queue for %s with revision %f", spec, revision)
 			if id != nil {
