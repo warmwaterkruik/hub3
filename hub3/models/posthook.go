@@ -34,12 +34,42 @@ type PostHookJobFactory struct {
 }
 
 // NewPostHookJob creates a new PostHookJob and populates the rdf2go Graph
-func NewPostHookJob(g *fragments.SortedGraph, spec string, delete bool, subject string) *PostHookJob {
+func NewPostHookJob(g *fragments.SortedGraph, spec string, delete bool, subject, hubID string) *PostHookJob {
+	//add foaf about
+
 	ph := &PostHookJob{g, spec, delete, subject}
 	if !delete {
 		ph.cleanPostHookGraph()
+		ph.addNarthexDefaults(hubID)
 	}
 	return ph
+}
+
+func (ph *PostHookJob) addNarthexDefaults(hubID string) {
+	log.Printf("adding defaults for %s", ph.Subject)
+	parts := strings.Split(hubID, "_")
+	localID := parts[2]
+	s := r.NewResource(ph.Subject + "/about")
+	ph.Graph.AddTriple(
+		s,
+		r.NewResource("http://www.w3.org/1999/02/22-rdf-syntax-ns#"),
+		r.NewResource("http://xmlns.com/foaf/0.1/Document"),
+	)
+	ph.Graph.AddTriple(
+		s,
+		r.NewResource("http://schemas.delving.eu/narthex/terms/hubId"),
+		r.NewLiteral(hubID),
+	)
+	ph.Graph.AddTriple(
+		s,
+		r.NewResource("http://schemas.delving.eu/narthex/terms/spec"),
+		r.NewLiteral(ph.Spec),
+	)
+	ph.Graph.AddTriple(
+		s,
+		r.NewResource("http://schemas.delving.eu/narthex/terms/localId"),
+		r.NewLiteral(localID),
+	)
 }
 
 // Valid determines if the posthok is valid to apply.
@@ -65,6 +95,8 @@ func ApplyPostHookJob(ph *PostHookJob) {
 		if err != nil {
 			log.Println(err)
 			log.Printf("Unable to send %s to %s", ph.Subject, u)
+			//} else {
+			//log.Printf("stored: %s", ph.Subject)
 		}
 	}
 }

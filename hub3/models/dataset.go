@@ -450,7 +450,8 @@ func (ds DataSet) deleteAllGraphs() (bool, error) {
 // to be delete to the PostHook workerpool.
 func CreateDeletePostHooks(ctx context.Context, q elastic.Query, wp *w.WorkerPool) error {
 	index.ESClient().Flush(c.Config.ElasticSearch.IndexName)
-	time.Sleep(1500 * time.Millisecond)
+	timer := time.NewTimer(time.Second * 5)
+	<-timer.C
 	scroll := index.ESClient().Scroll().
 		Index(c.Config.ElasticSearch.IndexName).
 		//StoredFields("system.source_uri", "entryURI").
@@ -477,13 +478,14 @@ func CreateDeletePostHooks(ctx context.Context, q elastic.Query, wp *w.WorkerPoo
 				return err
 			}
 			id := item["entryURI"]
-			spec := item[c.Config.ElasticSearch.SpecKey]
-			revision := item[c.Config.ElasticSearch.RevisionKey]
-			log.Printf("ph queue for %s with revision %f", spec, revision)
+			spec := item["spec"]
+			//revision := item["revision"]
+			hubID := item["hubID"]
 			if id != nil {
 				ds := string(spec.(string))
 				uri := string(id.(string))
-				ph := NewPostHookJob(nil, ds, true, uri)
+				//log.Printf("ph queue for %s with revision %f", ds, revision)
+				ph := NewPostHookJob(nil, ds, true, uri, hubID.(string))
 				if ph.Valid() {
 					wp.Submit(func() { ApplyPostHookJob(ph) })
 				}
@@ -514,6 +516,11 @@ func (ds DataSet) deleteIndexOrphans(ctx context.Context, wp *w.WorkerPool) (int
 	q = q.Must(elastic.NewTermQuery(c.Config.ElasticSearch.SpecKey, ds.Spec))
 	q = q.Must(elastic.NewTermQuery(c.Config.ElasticSearch.OrgIDKey, c.Config.OrgID))
 	// enqueue posthooks first
+	// block for 10 seconds to allow cluster to be in sync
+	timer := time.NewTimer(time.Second * 10)
+	<-timer.C
+	log.Print("Timer expired")
+
 	if ds.validForPostHook() {
 		err := CreateDeletePostHooks(ctx, q, wp)
 		if err != nil {
@@ -521,11 +528,6 @@ func (ds DataSet) deleteIndexOrphans(ctx context.Context, wp *w.WorkerPool) (int
 			return 0, err
 		}
 	}
-
-	// block for 10 seconds to allow cluster to be in sync
-	timer := time.NewTimer(time.Second * 10)
-	<-timer.C
-	log.Print("Timer expired")
 
 	res, err := index.ESClient().DeleteByQuery().
 		Index(c.Config.ElasticSearch.IndexName).
