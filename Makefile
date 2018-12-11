@@ -1,6 +1,6 @@
 .PHONY: package
 
-NAME:=rapid
+NAME:=rapid-saas
 MAINTAINER:="Sjoerd Siebinga <sjoerd@delving.eu>"
 DESCRIPTION:="RAPID Linked Open Data Platform"
 MODULE:=github.com/delving/rapid-saas
@@ -33,13 +33,14 @@ run:
 
 build:
 	@make clean-build
-	@go build -a -o build/$(NAME) -ldflags=$(LDFLAGS) $(MODULE)
+	rm -rf build
+	@go build -a -o build/$(NAME) -ldflags="$(LDFLAGS)" $(MODULE) 
 
 gox-build:
 	@make clean-build
-	cd build 
+	#cd build 
 	@make build 
-	gox -os="linux" -os="darwin" -os="windows" -arch="amd64" -ldflags=$(LDFLAGS) -output="build/$(NAME)-{{.OS}}-{{.Arch}}" $(MODULE) 
+	gox -os="linux" -os="darwin" -os="windows" -arch="amd64" -ldflags="$(LDFLAGS)" -output="build/$(NAME)-{{.OS}}-{{.Arch}}" $(MODULE) 
 	ls -la ./build/
 
 run-dev:
