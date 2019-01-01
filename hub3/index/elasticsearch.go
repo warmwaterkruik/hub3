@@ -26,6 +26,8 @@ import (
 
 	"github.com/delving/rapid-saas/config"
 	"github.com/delving/rapid-saas/hub3/fragments"
+	"github.com/delving/rapid-saas/hub3/fragments/mapping"
+
 	//elastic "github.com/olivere/elastic"
 	elastic "gopkg.in/olivere/elastic.v5"
 )
@@ -75,11 +77,11 @@ func ensureESIndex(index string) {
 
 	if !exists {
 		// Create a new index.
-		mapping := fragments.ESMapping
+		esMapping := fragments.ESMapping
 		if config.Config.ElasticSearch.IndexV1 {
-			mapping = fragments.V1ESMapping
+			esMapping = mapping.V1ESMapping
 		}
-		createIndex, err := client.CreateIndex(index).BodyJson(mapping).Do(ctx)
+		createIndex, err := client.CreateIndex(index).BodyJson(esMapping).Do(ctx)
 		if err != nil {
 			// Handle error
 			stdlog.Fatal(err)
