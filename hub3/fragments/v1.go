@@ -317,6 +317,7 @@ func (fb *FragmentBuilder) ResolveWebResources() error {
 	errChan := make(chan error)
 
 	urns := fb.GetUrns()
+	//log.Printf("%#v", urns)
 	for _, urn := range urns {
 		go fb.GetRemoteWebResource(urn, "", errChan)
 	}
@@ -562,11 +563,11 @@ func (fb *FragmentBuilder) AddDefaults(wr r.Term, s r.Term, g *SortedGraph) {
 		//time.Sleep(100 * time.Second)
 	}
 	if isShownBy != nil {
-		g.AddTriple(s, GetEDMField("isShownBy"), isShownBy)
+		g.AddTriple(s, GetEDMField("isShownBy"), r.NewResource(isShownBy.RawValue()))
 	}
 	object := fb.GetObject(wr, GetNaveField("thumbSmall"))
 	if object != nil {
-		g.AddTriple(s, GetEDMField("object"), isShownBy)
+		g.AddTriple(s, GetEDMField("object"), r.NewResource(object.RawValue()))
 	}
 }
 
