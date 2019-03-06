@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"encoding/json"
 	fmt "fmt"
+	"html"
 	"io"
 	"log"
 	"sort"
@@ -593,6 +594,8 @@ func (fb *FragmentBuilder) GetRemoteWebResource(urn string, orgID string, errCha
 			return
 		}
 		defer resp.Body.Close()
+		fb.Lock()
+		defer fb.Unlock()
 		err := fb.Graph.Parse(resp.Body, "text/turtle")
 		errChan <- err
 		return
@@ -734,8 +737,9 @@ func (fb *FragmentBuilder) CreateV1IndexEntry(t *r.Triple) (*IndexEntry, error) 
 		if len(value) > 32765 {
 			value = value[:32000]
 		}
+
 		// protect against XSS attacks in literals
-		value = fb.sanitizer.Sanitize(value)
+		value = html.UnescapeString(fb.sanitizer.Sanitize(value))
 
 		ie.Value = value
 		ie.Raw = value

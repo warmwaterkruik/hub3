@@ -63,7 +63,9 @@ type RawConfig struct {
 // PostHook contains the configuration for the JSON-LD posthook configuration
 type PostHook struct {
 	ExcludeSpec []string `json:"excludeSpec"`
-	URLs        []string `json:"urLs"`
+	URL         string   `json:"url"`
+	UserName    string   `json:"userName"`
+	Password    string   `json:"password"`
 }
 
 // ElasticSearch holds all the configuration values

@@ -25,6 +25,7 @@ import (
 	c "github.com/delving/rapid-saas/config"
 	"github.com/delving/rapid-saas/hub3/fragments"
 	"github.com/delving/rapid-saas/hub3/index"
+	"github.com/delving/rapid-saas/hub3/posthook"
 	w "github.com/gammazero/workerpool"
 
 	//elastic "github.com/olivere/elastic"
@@ -485,20 +486,20 @@ func CreateDeletePostHooks(ctx context.Context, q elastic.Query, wp *w.WorkerPoo
 				ds := string(spec.(string))
 				uri := string(id.(string))
 				//log.Printf("ph queue for %s with revision %f", ds, revision)
-				ph := NewPostHookJob(nil, ds, true, uri, hubID.(string))
+				ph := posthook.NewPostHookJob(nil, ds, true, uri, hubID.(string))
 				if ph.Valid() {
-					wp.Submit(func() { ApplyPostHookJob(ph) })
+					wp.Submit(func() { posthook.ApplyPostHookJob(ph) })
 				}
 			}
 		}
 	}
-	log.Println("Finished enqueueing posthooks")
-	return nil
+	//log.Println("Finished enqueueing posthooks")
+	//return nil
 }
 
 // ValidForPostHook determines if the posthook should be called.
 func (ds DataSet) validForPostHook() bool {
-	if len(c.Config.PostHook.URLs) == 0 {
+	if len(c.Config.PostHook.URL) == 0 {
 		return false
 	}
 	for _, e := range c.Config.PostHook.ExcludeSpec {

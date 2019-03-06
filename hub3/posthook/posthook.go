@@ -1,4 +1,4 @@
-package models
+package posthook
 
 import (
 	"bytes"
@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -79,6 +77,9 @@ func (ph PostHookJob) Valid() bool {
 
 // ProcessSpec determines if a PostHookJob should be applied for a specific spec
 func ProcessSpec(spec string) bool {
+	if c.Config.PostHook.URL == "" {
+		return false
+	}
 	for _, e := range c.Config.PostHook.ExcludeSpec {
 		if e == spec {
 			return false
@@ -90,14 +91,13 @@ func ProcessSpec(spec string) bool {
 // ApplyPostHookJob applies the PostHookJob to all the configured URLs
 func ApplyPostHookJob(ph *PostHookJob) {
 	//time.Sleep(100 * time.Millisecond)
-	for _, u := range c.Config.PostHook.URLs {
-		err := ph.Post(u)
-		if err != nil {
-			log.Println(err)
-			log.Printf("Unable to send %s to %s", ph.Subject, u)
-			//} else {
-			//log.Printf("stored: %s", ph.Subject)
-		}
+	u := c.Config.PostHook.URL
+	err := ph.Post(u)
+	if err != nil {
+		log.Println(err)
+		log.Printf("Unable to send %s to %s", ph.Subject, u)
+	} else {
+		log.Printf("stored: %s", ph.Subject)
 	}
 }
 
@@ -210,79 +210,79 @@ func cleanEbuCore(g *fragments.SortedGraph, t *r.Triple) bool {
 
 // ResourceSortOrder holds information to sort RDF:type webresources based on
 // their nave:resourceSortOrder key
-type ResourceSortOrder struct {
-	Resource map[string]interface{}
-	SortKey  int
-}
+//type ResourceSortOrder struct {
+//Resource map[string]interface{}
+//SortKey  int
+//}
 
-func sortMapArray(m []map[string]interface{}) []map[string]interface{} {
+//func sortMapArray(m []map[string]interface{}) []map[string]interface{} {
 
-	var ss []ResourceSortOrder
-	for _, wr := range m {
-		sortKey, ok := wr["http://schemas.delving.eu/nave/terms/resourceSortOrder"]
-		var sortOrder int
-		if ok {
-			sortKeyValue := sortKey.([]*r.LdObject)[0]
-			sortInt, err := strconv.Atoi(sortKeyValue.Value)
-			if err == nil {
-				sortOrder = sortInt
-			}
-		}
-		ss = append(ss, ResourceSortOrder{wr, sortOrder})
-	}
+//var ss []ResourceSortOrder
+//for _, wr := range m {
+//sortKey, ok := wr["http://schemas.delving.eu/nave/terms/resourceSortOrder"]
+//var sortOrder int
+//if ok {
+//sortKeyValue := sortKey.([]*r.LdObject)[0]
+//sortInt, err := strconv.Atoi(sortKeyValue.Value)
+//if err == nil {
+//sortOrder = sortInt
+//}
+//}
+//ss = append(ss, ResourceSortOrder{wr, sortOrder})
+//}
 
-	// sort by key
-	sort.Slice(ss, func(i, j int) bool {
-		return ss[i].SortKey < ss[j].SortKey
-	})
+//// sort by key
+//sort.Slice(ss, func(i, j int) bool {
+//return ss[i].SortKey < ss[j].SortKey
+//})
 
-	var entries []map[string]interface{}
-	for _, entry := range ss {
-		entries = append(entries, entry.Resource)
-	}
-	return entries
-}
+//var entries []map[string]interface{}
+//for _, entry := range ss {
+//entries = append(entries, entry.Resource)
+//}
+//return entries
+//}
 
-// sortWebResources sorts the webresources in order last
-func (ph *PostHookJob) sortWebResources() (bytes.Buffer, error) {
-	var b bytes.Buffer
+//// sortWebResources sorts the webresources in order last
+//func (ph *PostHookJob) sortWebResources() (bytes.Buffer, error) {
+//var b bytes.Buffer
 
-	entries := []map[string]interface{}{}
-	wr := []map[string]interface{}{}
+//entries := []map[string]interface{}{}
+//wr := []map[string]interface{}{}
 
-	jsonld, err := ph.Graph.GenerateJSONLD()
-	if err != nil {
-		return b, err
-	}
+//jsonld, err := ph.Graph.GenerateJSONLD()
+//if err != nil {
+//return b, err
+//}
 
-	for _, resource := range jsonld {
-		rdfTypes, ok := resource["@type"]
-		if !ok {
-			return b, fmt.Errorf("JSONLD entry does not contain @type definition")
-		}
-		for _, t := range rdfTypes.([]string) {
-			switch t {
-			case "http://www.europeana.eu/schemas/edm/WebResource":
-				wr = append(wr, resource)
-			default:
-				entries = append(entries, resource)
-			}
-		}
-	}
+//for _, resource := range jsonld {
+//rdfTypes, ok := resource["@type"]
+//if !ok {
+//return b, fmt.Errorf("JSONLD entry does not contain @type definition")
+//}
+//for _, t := range rdfTypes.([]string) {
+//switch t {
+//case "http://www.europeana.eu/schemas/edm/WebResource":
+//wr = append(wr, resource)
+//default:
+//entries = append(entries, resource)
+//}
+//}
+//}
 
-	for _, wrEntry := range sortMapArray(wr) {
-		entries = append(entries, wrEntry)
-	}
+//for _, wrEntry := range sortMapArray(wr) {
+//entries = append(entries, wrEntry)
+//}
 
-	// write bytes
-	bytes, err := json.Marshal(entries)
-	if err != nil {
-		return b, err
-	}
-	fmt.Fprint(&b, string(bytes))
+//// write bytes
+//bytes, err := json.Marshal(entries)
+//if err != nil {
+//return b, err
+//}
+//fmt.Fprint(&b, string(bytes))
 
-	return b, nil
-}
+//return b, nil
+//}
 
 // cleanPostHookGraph applies post hook clean actions to the graph
 func (ph *PostHookJob) cleanPostHookGraph() {

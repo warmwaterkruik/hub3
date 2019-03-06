@@ -28,6 +28,7 @@ import (
 	c "github.com/delving/rapid-saas/config"
 	"github.com/delving/rapid-saas/hub3/fragments"
 	"github.com/delving/rapid-saas/hub3/models"
+	"github.com/delving/rapid-saas/hub3/posthook"
 	"github.com/gammazero/workerpool"
 	r "github.com/kiivihal/rdf2go"
 
@@ -327,9 +328,9 @@ func (action *BulkAction) ESSave(response *BulkActionResponse, v1StylingIndexing
 		// add to posthook worker from v1
 		subject := strings.TrimSuffix(action.NamedGraphURI, "/graph")
 		g := fb.SortedGraph
-		ph := models.NewPostHookJob(g, action.Spec, false, subject, action.HubID)
+		ph := posthook.NewPostHookJob(g, action.Spec, false, subject, action.HubID)
 		if ph.Valid() {
-			action.wp.Submit(func() { models.ApplyPostHookJob(ph) })
+			action.wp.Submit(func() { posthook.ApplyPostHookJob(ph) })
 			//action.wp.Submit(func() { log.Println(ph.Subject) })
 		}
 	} else {

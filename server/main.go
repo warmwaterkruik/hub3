@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	c "github.com/delving/rapid-saas/config"
+	ph "github.com/delving/rapid-saas/hub3/posthook"
 	"github.com/phyber/negroni-gzip/gzip"
 
 	"github.com/go-chi/chi"
@@ -180,6 +181,9 @@ func Start(buildInfo *c.BuildVersionInfo) {
 
 	// RDF indexing endpoint
 	r.Mount("/api/es", IndexResource{}.Routes())
+
+	// PostHook endpoint
+	r.Mount("/api/posthook", ph.GetRoutes())
 
 	// datasets
 	r.Get("/api/datasets", listDataSets)

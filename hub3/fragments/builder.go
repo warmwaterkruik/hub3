@@ -21,6 +21,7 @@ import (
 	"log"
 	"net/url"
 	"strings"
+	"sync"
 
 	c "github.com/delving/rapid-saas/config"
 	r "github.com/kiivihal/rdf2go"
@@ -35,6 +36,7 @@ type FragmentBuilder struct {
 	ResourceLabels map[string]string
 	resources      *ResourceMap
 	sanitizer      *bluemonday.Policy
+	sync.Mutex
 }
 
 // ResourcesList returns a list of FragmentResource
