@@ -69,9 +69,11 @@ func afterFn(executionID int64, requests []elastic.BulkableRequest, response *el
 		return
 	}
 	if config.Config.ElasticSearch.IndexV1 && response != nil {
-		log.Printf("Errors in bulk request: %#v", response)
-		for _, item := range response.Failed() {
-			log.Printf("errored item: %#v errors: %#v", item, item.Error)
+		if response.Errors {
+			log.Printf("Errors in bulk request: %#v", response)
+			for _, item := range response.Failed() {
+				log.Printf("errored item: %#v errors: %#v", item, item.Error)
+			}
 		}
 	}
 }
