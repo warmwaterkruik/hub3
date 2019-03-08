@@ -486,9 +486,12 @@ func CreateDeletePostHooks(ctx context.Context, q elastic.Query, wp *w.WorkerPoo
 				ds := string(spec.(string))
 				uri := string(id.(string))
 				//log.Printf("ph queue for %s with revision %f", ds, revision)
-				ph := posthook.NewPostHookJob(nil, ds, true, uri, hubID.(string))
+				ph, err := posthook.NewPostHookJob("", ds, true, uri, hubID.(string))
+				if err != nil {
+					return err
+				}
 				if ph.Valid() {
-					wp.Submit(func() { posthook.ApplyPostHookJob(ph) })
+					posthook.Submit(wp, ph)
 				}
 			}
 		}

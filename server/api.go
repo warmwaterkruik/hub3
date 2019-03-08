@@ -53,7 +53,7 @@ func init() {
 	if err != nil {
 		log.Fatalf("Unable to start BulkProcessor: %#v", err)
 	}
-	wp = workerpool.New(10)
+	wp = workerpool.New(100)
 }
 
 // APIErrorMessage contains the default API error messages

@@ -66,6 +66,7 @@ type PostHook struct {
 	URL         string   `json:"url"`
 	UserName    string   `json:"userName"`
 	Password    string   `json:"password"`
+	APIKey      string   `json:"apiKey"`
 }
 
 // ElasticSearch holds all the configuration values

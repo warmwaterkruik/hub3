@@ -12,10 +12,9 @@ import (
 	"time"
 
 	c "github.com/delving/rapid-saas/config"
-	"github.com/delving/rapid-saas/hub3/fragments"
 	"github.com/delving/rapid-saas/hub3/index"
 	"github.com/go-chi/chi"
-	r "github.com/kiivihal/rdf2go"
+	"github.com/go-chi/render"
 	"github.com/pkg/errors"
 	elastic "gopkg.in/olivere/elastic.v5"
 )
@@ -48,10 +47,10 @@ func (rs postHookResource) Routes() chi.Router {
 	r := chi.NewRouter()
 
 	r.Get("/datasets", listDatasets)
-	//r.Delete("/datasets/{spec}", listDatasets)
+	r.Delete("/datasets/{spec}", deleteDataset)
 	r.Get("/input/{id}", showInput)
 	r.Get("/output/{id}", showOutput)
-	//r.Post("/{hudID}", storeJsonld)
+	r.Get("/counters", showCounter)
 
 	return r
 }
@@ -63,23 +62,36 @@ func NewESPostHook(ctx context.Context, hubID string) (*PostHookJob, error) {
 	}
 
 	ph := &PostHookJob{
-		Graph:   &fragments.SortedGraph{},
+		Graph:   source.SourceGraph,
 		Spec:    source.Spec,
 		Deleted: false,
 		Subject: source.Subject,
 	}
-
-	g := r.NewGraph("")
-	err = g.Parse(strings.NewReader(source.SourceGraph), "application/ld+json")
+	err = ph.parseJsonLD()
 	if err != nil {
 		return nil, err
 	}
 
-	for t := range g.IterTriples() {
-		if !cleanDates(ph.Graph, t) && !cleanEbuCore(ph.Graph, t) {
-			ph.Graph.Add(t)
-		}
+	ph.addNarthexDefaults(hubID)
+	ph.cleanPostHookGraph()
+	//log.Printf("%#v", ph.jsonld)
+
+	err = ph.updateJsonLD()
+	if err != nil {
+		return nil, err
 	}
+
+	//g := r.NewGraph("")
+	//err = g.Parse(strings.NewReader(source.SourceGraph), "application/ld+json")
+	//if err != nil {
+	//return nil, err
+	//}
+
+	//for t := range g.IterTriples() {
+	//if !cleanDates(ph.Graph, t) && !cleanEbuCore(ph.Graph, t) {
+	//ph.Graph.Add(t)
+	//}
+	//}
 
 	return ph, nil
 }
@@ -115,7 +127,7 @@ func showInput(w http.ResponseWriter, r *http.Request) {
 	source, err := getSource(r.Context(), hudID)
 	if err != nil {
 		if err.(*elastic.Error).Status == 404 {
-			//http.Error(w, "Not Found", http.StatusNotFound)
+			http.Error(w, "Not Found", http.StatusNotFound)
 			return
 		}
 		log.Printf("%#v", err)
@@ -127,11 +139,17 @@ func showInput(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
+func showCounter(w http.ResponseWriter, r *http.Request) {
+	render.JSON(w, r, gauge)
+	return
+}
+
 func showOutput(w http.ResponseWriter, r *http.Request) {
 	hubID := chi.URLParam(r, "id")
 	ph, err := NewESPostHook(r.Context(), hubID)
 	if err != nil {
 		if err.(*elastic.Error).Status == 404 {
+			http.Error(w, "Not Found", http.StatusNotFound)
 			//http.Error(w, "Not Found", http.StatusNotFound)
 			return
 		}
@@ -139,35 +157,68 @@ func showOutput(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	log.Printf("%#v", r.URL.Query())
+	if r.URL.Query().Get("store") == "true" {
+		log.Println("storing the posthook")
+		Submit(nil, ph)
+	}
 	w.Header().Set("Content-Type", "application/ld+json")
-	ph.Graph.SerializeFlatJSONLD(w)
-	//w.Write(ph.Bytes)
-	return
-}
-
-func storeJsonld(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprint(w, ph.Graph)
 	return
 }
 
 func deleteDataset(w http.ResponseWriter, r *http.Request) {
+	dataset := chi.URLParam(r, "spec")
+	url := fmt.Sprintf("%s/api/erfgoedbrabant/brabantcloud", strings.TrimSuffix(c.Config.PostHook.URL, "/"))
+	req, err := http.NewRequest("DELETE", url, nil)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	//req.Header.Set("Cookie", key.Key)
+	q := req.URL.Query()
+	q.Add("api_key", c.Config.PostHook.APIKey)
+	q.Add("collection", dataset)
+	req.URL.RawQuery = q.Encode()
+
+	req.Header.Set("Content-Type", "application/json")
+
+	var netClient = &http.Client{
+		Timeout: time.Second * 5,
+	}
+	resp, err := netClient.Do(req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+	w.Header().Set("Content-Type", "text/plain")
+	_, err = io.Copy(w, resp.Body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	return
 }
 
 // ListDatasets returns a list of indexed datasets from the PostHook endpoint.
 // It renews the authorisation key when this not valid.
 func listDatasets(w http.ResponseWriter, r *http.Request) {
-	key, err := getAuthKey()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	//key, err := getAuthKey()
+	//if err != nil {
+	//http.Error(w, err.Error(), http.StatusInternalServerError)
+	//return
+	//}
 	url := fmt.Sprintf("%s/api/erfgoedbrabant/brabantcloud", strings.TrimSuffix(c.Config.PostHook.URL, "/"))
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	req.Header.Set("Cookie", key.Key)
+	//req.Header.Set("Cookie", key.Key)
+	q := req.URL.Query()
+	q.Add("api_key", c.Config.PostHook.APIKey)
+	req.URL.RawQuery = q.Encode()
 
 	req.Header.Set("Content-Type", "application/json")
 
@@ -186,7 +237,6 @@ func listDatasets(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	log.Println(key)
 
 	//render.PlainText(w, r, key.Key)
 	return
@@ -219,6 +269,7 @@ func renewAuthKey() (AuthKey, error) {
 
 	zSid := resp.Header.Get("Set-Cookie")
 	if zSid == "" || resp.StatusCode != 200 {
+		log.Printf("err = %#v", resp)
 		return authKey, errors.New("unable to get auth key from response")
 	}
 	authKey.Lock()

@@ -327,11 +327,13 @@ func (action *BulkAction) ESSave(response *BulkActionResponse, v1StylingIndexing
 		}
 		// add to posthook worker from v1
 		subject := strings.TrimSuffix(action.NamedGraphURI, "/graph")
-		g := fb.SortedGraph
-		ph := posthook.NewPostHookJob(g, action.Spec, false, subject, action.HubID)
+		ph, err := posthook.NewPostHookJob(indexDoc["system"].(*fragments.System).SourceGraph, action.Spec, false, subject, action.HubID)
+		if err != nil {
+			return err
+		}
+
 		if ph.Valid() {
-			action.wp.Submit(func() { posthook.ApplyPostHookJob(ph) })
-			//action.wp.Submit(func() { log.Println(ph.Subject) })
+			posthook.Submit(action.wp, ph)
 		}
 	} else {
 		// index the LoD Fragments

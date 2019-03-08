@@ -7,11 +7,12 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	c "github.com/delving/rapid-saas/config"
 	"github.com/delving/rapid-saas/hub3/fragments"
-	"github.com/gammazero/workerpool"
+	w "github.com/gammazero/workerpool"
 	r "github.com/kiivihal/rdf2go"
 	ld "github.com/linkeddata/gojsonld"
 	"github.com/parnurzeal/gorequest"
@@ -19,55 +20,144 @@ import (
 
 // PostHookJob  holds the info for building a crea
 type PostHookJob struct {
-	Graph   *fragments.SortedGraph
+	Graph   string
 	Spec    string
 	Deleted bool
 	Subject string
+	jsonld  []map[string]interface{}
 }
 
-// PostHookJobFactory can be used to fire off PostHookJob jobs
-type PostHookJobFactory struct {
-	Spec string
-	wp   *workerpool.WorkerPool
+type PostHookCounter struct {
+	ToIndex           int `json:"toIndex"`
+	ToDelete          int `json:"toDelete"`
+	InError           int `json:"inError"`
+	LifeTimeQueued    int `json:"lifeTimeQueued"`
+	LifeTimeProcessed int `json:"lifeTimeProcessed"`
+}
+
+type PostHookGauge struct {
+	Created  time.Time                   `json:"created"`
+	Counters map[string]*PostHookCounter `json:"counters"`
+	sync.Mutex
+}
+
+func (phg *PostHookGauge) Done(ph *PostHookJob) error {
+	counter, ok := phg.Counters[ph.Spec]
+	if !ok {
+		counter = &PostHookCounter{}
+		phg.Counters[ph.Spec] = counter
+	}
+	phg.Lock()
+	defer phg.Unlock()
+	counter.ToIndex--
+	counter.LifeTimeProcessed++
+	return nil
+}
+
+func (phg *PostHookGauge) Error(ph *PostHookJob) error {
+	counter, ok := phg.Counters[ph.Spec]
+	if !ok {
+		counter = &PostHookCounter{}
+		phg.Counters[ph.Spec] = counter
+	}
+	phg.Lock()
+	defer phg.Unlock()
+	counter.InError++
+	counter.LifeTimeProcessed++
+	counter.ToIndex--
+	return nil
+}
+
+func (phg *PostHookGauge) Queue(ph *PostHookJob) error {
+	//log.Println("queing posthook")
+	counter, ok := phg.Counters[ph.Spec]
+	if !ok {
+		counter = &PostHookCounter{}
+		phg.Counters[ph.Spec] = counter
+	}
+	phg.Lock()
+	defer phg.Unlock()
+	counter.LifeTimeQueued++
+
+	if ph.Deleted {
+		counter.ToDelete++
+		return nil
+	}
+
+	counter.ToIndex++
+	return nil
+}
+
+var gauge PostHookGauge
+
+func init() {
+	gauge = PostHookGauge{
+		Created:  time.Now(),
+		Counters: make(map[string]*PostHookCounter),
+	}
 }
 
 // NewPostHookJob creates a new PostHookJob and populates the rdf2go Graph
-func NewPostHookJob(g *fragments.SortedGraph, spec string, delete bool, subject, hubID string) *PostHookJob {
+func NewPostHookJob(g, spec string, delete bool, subject, hubID string) (*PostHookJob, error) {
 	//add foaf about
 
-	ph := &PostHookJob{g, spec, delete, subject}
-	if !delete {
-		ph.cleanPostHookGraph()
-		ph.addNarthexDefaults(hubID)
+	ph := &PostHookJob{
+		Graph:   g,
+		Spec:    spec,
+		Deleted: delete,
+		Subject: subject,
 	}
-	return ph
+	if !delete {
+		// setup the cleanup
+		err := ph.parseJsonLD()
+		if err != nil {
+			return nil, err
+		}
+
+		ph.addNarthexDefaults(hubID)
+		ph.cleanPostHookGraph()
+		//log.Printf("%#v", ph.jsonld)
+
+		err = ph.updateJsonLD()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return ph, nil
+}
+
+func (ph *PostHookJob) parseJsonLD() error {
+	var jsonld []map[string]interface{}
+	err := json.Unmarshal([]byte(ph.Graph), &jsonld)
+	if err != nil {
+		return err
+	}
+	ph.jsonld = jsonld
+	return nil
+}
+
+func (ph *PostHookJob) updateJsonLD() error {
+	b, err := json.Marshal(ph.jsonld)
+	if err != nil {
+		return err
+	}
+	ph.Graph = string(b)
+	return nil
 }
 
 func (ph *PostHookJob) addNarthexDefaults(hubID string) {
 	//log.Printf("adding defaults for %s", ph.Subject)
 	parts := strings.Split(hubID, "_")
 	localID := parts[2]
-	s := r.NewResource(ph.Subject + "/about")
-	ph.Graph.AddTriple(
-		s,
-		r.NewResource("http://www.w3.org/1999/02/22-rdf-syntax-ns#"),
-		r.NewResource("http://xmlns.com/foaf/0.1/Document"),
-	)
-	ph.Graph.AddTriple(
-		s,
-		r.NewResource("http://schemas.delving.eu/narthex/terms/hubId"),
-		r.NewLiteral(hubID),
-	)
-	ph.Graph.AddTriple(
-		s,
-		r.NewResource("http://schemas.delving.eu/narthex/terms/spec"),
-		r.NewLiteral(ph.Spec),
-	)
-	ph.Graph.AddTriple(
-		s,
-		r.NewResource("http://schemas.delving.eu/narthex/terms/localId"),
-		r.NewLiteral(localID),
-	)
+	subject := ph.Subject + "/about"
+	defaults := make(map[string]interface{})
+	defaults["@id"] = subject
+	defaults["@type"] = []string{"http://xmlns.com/foaf/0.1/Document"}
+	defaults["http://schemas.delving.eu/narthex/terms/localId"] = []string{localID}
+	defaults["http://schemas.delving.eu/narthex/terms/hubID"] = []string{hubID}
+	defaults["http://schemas.delving.eu/narthex/terms/spec"] = []string{ph.Spec}
+
+	ph.jsonld = append(ph.jsonld, defaults)
 }
 
 // Valid determines if the posthok is valid to apply.
@@ -88,31 +178,46 @@ func ProcessSpec(spec string) bool {
 	return true
 }
 
+func Submit(wp *w.WorkerPool, ph *PostHookJob) {
+	gauge.Queue(ph)
+	if wp != nil {
+		wp.Submit(func() { ApplyPostHookJob(ph) })
+		return
+	}
+	ApplyPostHookJob(ph)
+	return
+}
+
 // ApplyPostHookJob applies the PostHookJob to all the configured URLs
 func ApplyPostHookJob(ph *PostHookJob) {
-	//time.Sleep(100 * time.Millisecond)
-	u := c.Config.PostHook.URL
-	err := ph.Post(u)
+	u := strings.TrimSuffix(c.Config.PostHook.URL, "/")
+	url := fmt.Sprintf("%s/api/erfgoedbrabant/brabantcloud", u)
+	err := ph.Post(url)
 	if err != nil {
+		gauge.Error(ph)
 		log.Println(err)
 		log.Printf("Unable to send %s to %s", ph.Subject, u)
-	} else {
-		log.Printf("stored: %s", ph.Subject)
+		//} else {
+		//log.Printf("stored: %s", ph.Subject)
+		return
 	}
+	gauge.Done(ph)
+	return
 }
 
 // Post sends json-ld to the specified endpointt
 func (ph PostHookJob) Post(url string) error {
+
 	request := gorequest.New()
 	if ph.Deleted {
 		log.Printf("Deleting via posthook: %s", ph.Subject)
 		deleteURL := fmt.Sprintf("%s/delete", url)
 		req := request.Delete(deleteURL).
-			Query(fmt.Sprintf("id=%s", ph.Subject)).
+			Query(fmt.Sprintf("id=%s&api_key=%s", ph.Subject, c.Config.PostHook.APIKey)).
 			Retry(3, 5*time.Second, http.StatusBadRequest, http.StatusInternalServerError, http.StatusRequestTimeout)
 		//log.Printf("%v", req)
 		rsp, body, errs := req.End()
-		if errs != nil || rsp.StatusCode != http.StatusNoContent {
+		if errs != nil || rsp.StatusCode != http.StatusOK {
 			log.Printf("post-response: %#v -> %#v\n %#v", rsp, body, errs)
 			log.Printf("Unable to delete: %#v", errs)
 			return fmt.Errorf("Unable to save %s to endpoint %s", ph.Subject, url)
@@ -128,6 +233,7 @@ func (ph PostHookJob) Post(url string) error {
 
 	rsp, body, errs := request.Post(url).
 		Set("Content-Type", "application/json-ld; charset=utf-8").
+		Query(fmt.Sprintf("api_key=%s", c.Config.PostHook.APIKey)).
 		Type("text").
 		Send(json).
 		Retry(3, 5*time.Second, http.StatusBadRequest, http.StatusInternalServerError, http.StatusRequestTimeout).
@@ -208,123 +314,68 @@ func cleanEbuCore(g *fragments.SortedGraph, t *r.Triple) bool {
 	return false
 }
 
-// ResourceSortOrder holds information to sort RDF:type webresources based on
-// their nave:resourceSortOrder key
-//type ResourceSortOrder struct {
-//Resource map[string]interface{}
-//SortKey  int
-//}
-
-//func sortMapArray(m []map[string]interface{}) []map[string]interface{} {
-
-//var ss []ResourceSortOrder
-//for _, wr := range m {
-//sortKey, ok := wr["http://schemas.delving.eu/nave/terms/resourceSortOrder"]
-//var sortOrder int
-//if ok {
-//sortKeyValue := sortKey.([]*r.LdObject)[0]
-//sortInt, err := strconv.Atoi(sortKeyValue.Value)
-//if err == nil {
-//sortOrder = sortInt
-//}
-//}
-//ss = append(ss, ResourceSortOrder{wr, sortOrder})
-//}
-
-//// sort by key
-//sort.Slice(ss, func(i, j int) bool {
-//return ss[i].SortKey < ss[j].SortKey
-//})
-
-//var entries []map[string]interface{}
-//for _, entry := range ss {
-//entries = append(entries, entry.Resource)
-//}
-//return entries
-//}
-
-//// sortWebResources sorts the webresources in order last
-//func (ph *PostHookJob) sortWebResources() (bytes.Buffer, error) {
-//var b bytes.Buffer
-
-//entries := []map[string]interface{}{}
-//wr := []map[string]interface{}{}
-
-//jsonld, err := ph.Graph.GenerateJSONLD()
-//if err != nil {
-//return b, err
-//}
-
-//for _, resource := range jsonld {
-//rdfTypes, ok := resource["@type"]
-//if !ok {
-//return b, fmt.Errorf("JSONLD entry does not contain @type definition")
-//}
-//for _, t := range rdfTypes.([]string) {
-//switch t {
-//case "http://www.europeana.eu/schemas/edm/WebResource":
-//wr = append(wr, resource)
-//default:
-//entries = append(entries, resource)
-//}
-//}
-//}
-
-//for _, wrEntry := range sortMapArray(wr) {
-//entries = append(entries, wrEntry)
-//}
-
-//// write bytes
-//bytes, err := json.Marshal(entries)
-//if err != nil {
-//return b, err
-//}
-//fmt.Fprint(&b, string(bytes))
-
-//return b, nil
-//}
+func cleanDateURI(uri string) string {
+	return fmt.Sprintf("%sRaw", uri)
+}
 
 // cleanPostHookGraph applies post hook clean actions to the graph
 func (ph *PostHookJob) cleanPostHookGraph() {
-	newGraph := &fragments.SortedGraph{}
-	for _, t := range ph.Graph.Triples() {
-		if !cleanDates(newGraph, t) && !cleanEbuCore(newGraph, t) {
-			newGraph.Add(t)
+	cleanMap := []map[string]interface{}{}
+	for _, rsc := range ph.jsonld {
+		cleanEntry := make(map[string]interface{})
+		for uri, v := range rsc {
+			if strings.HasPrefix(uri, "urn:ebu:metadata-schema:ebuCore_2014") {
+				uri = strings.TrimLeft(uri, "urn:ebu:metadata-schema:ebuCore_2014")
+				uri = strings.TrimLeft(uri, "/")
+				uri = fmt.Sprintf("http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#%s", uri)
+			}
+			switch uri {
+			case ns.dcterms.Get("created").RawValue():
+				uri = cleanDateURI(uri)
+			case ns.dcterms.Get("issued").RawValue():
+				uri = cleanDateURI(uri)
+			case ns.nave.Get("creatorBirthYear").RawValue():
+				uri = cleanDateURI(uri)
+			case ns.nave.Get("creatorDeathYear").RawValue():
+				uri = cleanDateURI(uri)
+			case ns.nave.Get("date").RawValue():
+				uri = cleanDateURI(uri)
+			case ns.dc.Get("date").RawValue():
+				uri = cleanDateURI(uri)
+			case ns.nave.Get("dateOfBurial").RawValue():
+				uri = cleanDateURI(uri)
+			case ns.nave.Get("dateOfDeath").RawValue():
+				uri = cleanDateURI(uri)
+			case ns.nave.Get("productionEnd").RawValue():
+				uri = cleanDateURI(uri)
+			case ns.nave.Get("productionStart").RawValue():
+				uri = cleanDateURI(uri)
+			case ns.nave.Get("productionPeriod").RawValue():
+				uri = cleanDateURI(uri)
+			case ns.rdagr2.Get("dateOfBirth").RawValue():
+				uri = cleanDateURI(uri)
+			case ns.rdagr2.Get("dateOfDeath").RawValue():
+				uri = cleanDateURI(uri)
+
+			}
+			cleanEntry[uri] = v
+
 		}
+		cleanMap = append(cleanMap, cleanEntry)
+
 	}
-	ph.Graph = newGraph
+	ph.jsonld = cleanMap
 }
 
 // Bytes returns the PostHookJob as an JSON-LD bytes.Buffer
 func (ph PostHookJob) Bytes() (bytes.Buffer, error) {
 	var b bytes.Buffer
-	err := ph.Graph.SerializeFlatJSONLD(&b)
-	if err != nil {
-		return b, err
-	}
+	b.WriteString(ph.Graph)
 	return b, nil
 }
 
 // Bytes returns the PostHookJob as an JSON-LD string
 func (ph PostHookJob) String() (string, error) {
 
-	//b, err := ph.sortWebResources()
-	//if err != nil {
-	//return "", err
-	//}
-	//return b.String(), nil
-	var b bytes.Buffer
-
-	entries, err := ph.Graph.GenerateJSONLD()
-	if err != nil {
-		return "", err
-	}
-
-	// write bytes
-	bytes, err := json.Marshal(entries)
-	if err != nil {
-		return "", err
-	}
-	fmt.Fprint(&b, string(bytes))
-	return b.String(), nil
+	return ph.Graph, nil
 }
