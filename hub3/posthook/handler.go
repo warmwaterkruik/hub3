@@ -141,7 +141,8 @@ func showInput(w http.ResponseWriter, r *http.Request) {
 
 func showCounter(w http.ResponseWriter, r *http.Request) {
 	filterActive := r.URL.Query().Get("active") == "true"
-	if filterActive {
+	filterError := r.URL.Query().Get("error") == "true"
+	if filterActive || filterError {
 		filteredGauge := PostHookGauge{
 			Created:   gauge.Created,
 			QueueSize: gauge.QueueSize,
@@ -149,8 +150,13 @@ func showCounter(w http.ResponseWriter, r *http.Request) {
 		}
 
 		for k, v := range gauge.Counters {
-			if v.IsActive {
+			switch {
+			case v.IsActive && filterActive:
 				filteredGauge.Counters[k] = v
+				continue
+			case v.InError != 1 && filterError:
+				filteredGauge.Counters[k] = v
+				continue
 			}
 		}
 

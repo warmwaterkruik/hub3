@@ -44,18 +44,14 @@ type PostHookGauge struct {
 }
 
 func (phg *PostHookGauge) SetActive(counter *PostHookCounter) {
-	if counter.LifeTimeProcessed+counter.InError != counter.LifeTimeQueued {
+	if counter.LifeTimeProcessed != counter.LifeTimeQueued {
 		if counter.IsActive {
 			return
 		}
-		//phg.Lock()
-		//defer phg.Unlock()
 		counter.IsActive = true
 		return
 	}
 	if counter.IsActive {
-		//phg.Lock()
-		//defer phg.Unlock()
 		counter.IsActive = false
 		return
 	}
@@ -71,7 +67,12 @@ func (phg *PostHookGauge) Done(ph *PostHookJob) error {
 	phg.Lock()
 	defer phg.Unlock()
 	phg.QueueSize--
-	counter.ToIndex--
+	switch ph.Deleted {
+	case true:
+		counter.ToDelete--
+	default:
+		counter.ToIndex--
+	}
 	counter.LifeTimeProcessed++
 	phg.SetActive(counter)
 	return nil
@@ -85,9 +86,14 @@ func (phg *PostHookGauge) Error(ph *PostHookJob) error {
 	}
 	phg.Lock()
 	defer phg.Unlock()
+	switch ph.Deleted {
+	case true:
+		counter.ToDelete--
+	default:
+		counter.ToIndex--
+	}
 	counter.InError++
 	counter.LifeTimeProcessed++
-	counter.ToIndex--
 	phg.QueueSize--
 	phg.SetActive(counter)
 	return nil
@@ -244,10 +250,14 @@ func (ph PostHookJob) Post(url string) error {
 			Retry(3, 5*time.Second, http.StatusBadRequest, http.StatusInternalServerError, http.StatusRequestTimeout)
 		//log.Printf("%v", req)
 		rsp, body, errs := req.End()
-		if errs != nil || rsp.StatusCode != http.StatusOK {
-			log.Printf("post-response: %#v -> %#v\n %#v", rsp, body, errs)
-			log.Printf("Unable to delete: %#v", errs)
-			return fmt.Errorf("Unable to save %s to endpoint %s", ph.Subject, url)
+		if errs != nil {
+			switch rsp.StatusCode {
+			case http.StatusOK, http.StatusCreated:
+			default:
+				log.Printf("post-response: %#v -> %#v\n %#v", rsp, body, errs)
+				log.Printf("Unable to delete: %#v", errs)
+				return fmt.Errorf("Unable to save %s to endpoint %s", ph.Subject, url)
+			}
 		}
 		//log.Printf("Deleted %s\n", ph.Subject)
 		return nil
