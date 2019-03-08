@@ -28,17 +28,38 @@ type PostHookJob struct {
 }
 
 type PostHookCounter struct {
-	ToIndex           int `json:"toIndex"`
-	ToDelete          int `json:"toDelete"`
-	InError           int `json:"inError"`
-	LifeTimeQueued    int `json:"lifeTimeQueued"`
-	LifeTimeProcessed int `json:"lifeTimeProcessed"`
+	ToIndex           int  `json:"toIndex"`
+	ToDelete          int  `json:"toDelete"`
+	InError           int  `json:"inError"`
+	LifeTimeQueued    int  `json:"lifeTimeQueued"`
+	LifeTimeProcessed int  `json:"lifeTimeProcessed"`
+	IsActive          bool `json:"isActive"`
 }
 
 type PostHookGauge struct {
-	Created  time.Time                   `json:"created"`
-	Counters map[string]*PostHookCounter `json:"counters"`
+	Created   time.Time                   `json:"created"`
+	QueueSize int                         `json:"queueSize"`
+	Counters  map[string]*PostHookCounter `json:"counters"`
 	sync.Mutex
+}
+
+func (phg *PostHookGauge) SetActive(counter *PostHookCounter) {
+	if counter.LifeTimeProcessed+counter.InError != counter.LifeTimeQueued {
+		if counter.IsActive {
+			return
+		}
+		//phg.Lock()
+		//defer phg.Unlock()
+		counter.IsActive = true
+		return
+	}
+	if counter.IsActive {
+		//phg.Lock()
+		//defer phg.Unlock()
+		counter.IsActive = false
+		return
+	}
+	return
 }
 
 func (phg *PostHookGauge) Done(ph *PostHookJob) error {
@@ -49,8 +70,10 @@ func (phg *PostHookGauge) Done(ph *PostHookJob) error {
 	}
 	phg.Lock()
 	defer phg.Unlock()
+	phg.QueueSize--
 	counter.ToIndex--
 	counter.LifeTimeProcessed++
+	phg.SetActive(counter)
 	return nil
 }
 
@@ -65,6 +88,8 @@ func (phg *PostHookGauge) Error(ph *PostHookJob) error {
 	counter.InError++
 	counter.LifeTimeProcessed++
 	counter.ToIndex--
+	phg.QueueSize--
+	phg.SetActive(counter)
 	return nil
 }
 
@@ -78,6 +103,8 @@ func (phg *PostHookGauge) Queue(ph *PostHookJob) error {
 	phg.Lock()
 	defer phg.Unlock()
 	counter.LifeTimeQueued++
+	phg.QueueSize++
+	phg.SetActive(counter)
 
 	if ph.Deleted {
 		counter.ToDelete++

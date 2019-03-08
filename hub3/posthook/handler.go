@@ -140,6 +140,24 @@ func showInput(w http.ResponseWriter, r *http.Request) {
 }
 
 func showCounter(w http.ResponseWriter, r *http.Request) {
+	filterActive := r.URL.Query().Get("active") == "true"
+	if filterActive {
+		filteredGauge := PostHookGauge{
+			Created:   gauge.Created,
+			QueueSize: gauge.QueueSize,
+			Counters:  make(map[string]*PostHookCounter),
+		}
+
+		for k, v := range gauge.Counters {
+			if v.IsActive {
+				filteredGauge.Counters[k] = v
+			}
+		}
+
+		render.JSON(w, r, filteredGauge)
+		return
+	}
+
 	render.JSON(w, r, gauge)
 	return
 }
