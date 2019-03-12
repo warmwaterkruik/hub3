@@ -57,7 +57,12 @@ type RawConfig struct {
 	RDFTag        `json:"rdftag"`
 	PostHook      `json:"postHook"`
 	Cache         `json:"cache"`
+	DIW           `json:"diw"`
 	RDFTagMap     *RDFTagMap `json:"rdfTagMap"`
+}
+
+type DIW struct {
+	EmailKey string `json:"emailKey"`
 }
 
 // PostHook contains the configuration for the JSON-LD posthook configuration

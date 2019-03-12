@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	c "github.com/delving/rapid-saas/config"
+	"github.com/delving/rapid-saas/hub3/models"
 	ph "github.com/delving/rapid-saas/hub3/posthook"
 	"github.com/phyber/negroni-gzip/gzip"
 
@@ -184,6 +185,9 @@ func Start(buildInfo *c.BuildVersionInfo) {
 
 	// PostHook endpoint
 	r.Mount("/api/posthook", ph.GetRoutes())
+
+	// diw
+	r.Post("/api/diw/message", models.DiwHandler)
 
 	// datasets
 	r.Get("/api/datasets", listDataSets)
