@@ -30,7 +30,6 @@ import (
 	"github.com/delving/rapid-saas/hub3/harvesting"
 	"github.com/delving/rapid-saas/hub3/index"
 	"github.com/delving/rapid-saas/hub3/models"
-	"github.com/gammazero/workerpool"
 
 	//elastic "github.com/olivere/elastic"
 	elastic "gopkg.in/olivere/elastic.v5"
@@ -42,7 +41,6 @@ import (
 )
 
 var bp *elastic.BulkProcessor
-var wp *workerpool.WorkerPool
 var ctx context.Context
 
 func init() {
@@ -53,7 +51,6 @@ func init() {
 	if err != nil {
 		log.Fatalf("Unable to start BulkProcessor: %#v", err)
 	}
-	wp = workerpool.New(100)
 }
 
 // APIErrorMessage contains the default API error messages
@@ -132,7 +129,7 @@ func csvUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = ds.DropOrphans(ctx, wp)
+	_, err = ds.DropOrphans(ctx)
 	if err != nil {
 		render.PlainText(w, r, err.Error())
 		return
@@ -147,7 +144,7 @@ func csvUpload(w http.ResponseWriter, r *http.Request) {
 // bulkApi receives bulkActions in JSON form (1 per line) and processes them in
 // ingestion pipeline.
 func bulkAPI(w http.ResponseWriter, r *http.Request) {
-	response, err := hub3.ReadActions(ctx, r.Body, bp, wp)
+	response, err := hub3.ReadActions(ctx, r.Body, bp)
 	if err != nil {
 		log.Println("Unable to read actions")
 		errR := ErrRender(err)
@@ -394,7 +391,7 @@ func deleteDataset(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Dataset is not found: %s", spec)
 		return
 	}
-	ok, err := ds.DropAll(ctx, wp)
+	ok, err := ds.DropAll(ctx)
 	if !ok || err != nil {
 		render.Status(r, http.StatusBadRequest)
 		log.Printf("Unable to delete request because: %s", err)

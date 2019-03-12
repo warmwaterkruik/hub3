@@ -29,7 +29,6 @@ import (
 	"github.com/delving/rapid-saas/hub3/fragments"
 	"github.com/delving/rapid-saas/hub3/models"
 	"github.com/delving/rapid-saas/hub3/posthook"
-	"github.com/gammazero/workerpool"
 	r "github.com/kiivihal/rdf2go"
 
 	//elastic "github.com/olivere/elastic"
@@ -48,7 +47,6 @@ type BulkAction struct {
 	Graph         string                 `json:"graph"`
 	RDF           string                 `json:"rdf"`
 	p             *elastic.BulkProcessor `json:"p"`
-	wp            *workerpool.WorkerPool `json:"wp"`
 }
 
 // SparqlUpdate contains the elements to perform a SPARQL update query
@@ -109,7 +107,7 @@ type BulkActionResponse struct {
 }
 
 // ReadActions reads BulkActions from an io.Reader line by line.
-func ReadActions(ctx context.Context, r io.Reader, p *elastic.BulkProcessor, wp *workerpool.WorkerPool) (BulkActionResponse, error) {
+func ReadActions(ctx context.Context, r io.Reader, p *elastic.BulkProcessor) (BulkActionResponse, error) {
 	//log.Println("Start reading actions.")
 	scanner := bufio.NewScanner(r)
 	buf := make([]byte, 0, 64*1024)
@@ -132,7 +130,6 @@ func ReadActions(ctx context.Context, r io.Reader, p *elastic.BulkProcessor, wp 
 			continue
 		}
 		action.p = p
-		action.wp = wp
 
 		//err = ioutil.WriteFile(fmt.Sprintf("/tmp/es_actions/%s.json", action.HubID), []byte(action.Graph), 0644)
 		//err = ioutil.WriteFile(fmt.Sprintf("/tmp/raw_graph/%s.json", action.HubID), []byte(action.Graph), 0644)
@@ -199,21 +196,21 @@ func (action BulkAction) Execute(ctx context.Context, response *BulkActionRespon
 			return err
 		}
 		log.Printf("Flushed remaining items on the index queue.")
-		ok, err := ds.DropOrphans(ctx, action.wp)
+		ok, err := ds.DropOrphans(ctx)
 		if !ok || err != nil {
 			log.Printf("Unable to drop orphans for %s: %#v\n", action.Spec, err)
 			return err
 		}
 		log.Printf("Mark orphans and delete them for %s", action.Spec)
 	case "disable_index":
-		ok, err := ds.DropRecords(ctx, action.wp)
+		ok, err := ds.DropRecords(ctx)
 		if !ok || err != nil {
 			log.Printf("Unable to drop records for %s\n", action.Spec)
 			return err
 		}
 		log.Printf("remove dataset %s from the storage", action.Spec)
 	case "drop_dataset":
-		ok, err := ds.DropAll(ctx, action.wp)
+		ok, err := ds.DropAll(ctx)
 		if !ok || err != nil {
 			log.Printf("Unable to drop dataset %s", action.Spec)
 			return err
@@ -333,7 +330,7 @@ func (action *BulkAction) ESSave(response *BulkActionResponse, v1StylingIndexing
 		}
 
 		if ph.Valid() {
-			posthook.Submit(action.wp, ph)
+			posthook.Submit(ph)
 		}
 	} else {
 		// index the LoD Fragments

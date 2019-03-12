@@ -142,6 +142,7 @@ func showInput(w http.ResponseWriter, r *http.Request) {
 func showCounter(w http.ResponseWriter, r *http.Request) {
 	filterActive := r.URL.Query().Get("active") == "true"
 	filterError := r.URL.Query().Get("error") == "true"
+	gauge.ActiveDatasets = len(gauge.Counters)
 	if filterActive || filterError {
 		filteredGauge := PostHookGauge{
 			Created:   gauge.Created,
@@ -154,7 +155,7 @@ func showCounter(w http.ResponseWriter, r *http.Request) {
 			case v.IsActive && filterActive:
 				filteredGauge.Counters[k] = v
 				continue
-			case v.InError != 1 && filterError:
+			case v.InError != 0 && filterError:
 				filteredGauge.Counters[k] = v
 				continue
 			}
@@ -174,7 +175,6 @@ func showOutput(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if err.(*elastic.Error).Status == 404 {
 			http.Error(w, "Not Found", http.StatusNotFound)
-			//http.Error(w, "Not Found", http.StatusNotFound)
 			return
 		}
 		log.Printf("%#v", err)
@@ -184,7 +184,7 @@ func showOutput(w http.ResponseWriter, r *http.Request) {
 	log.Printf("%#v", r.URL.Query())
 	if r.URL.Query().Get("store") == "true" {
 		log.Println("storing the posthook")
-		Submit(nil, ph)
+		Submit(ph)
 	}
 	w.Header().Set("Content-Type", "application/ld+json")
 	fmt.Fprint(w, ph.Graph)

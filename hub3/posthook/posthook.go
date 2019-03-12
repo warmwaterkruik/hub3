@@ -12,7 +12,7 @@ import (
 
 	c "github.com/delving/rapid-saas/config"
 	"github.com/delving/rapid-saas/hub3/fragments"
-	w "github.com/gammazero/workerpool"
+	"github.com/gammazero/workerpool"
 	r "github.com/kiivihal/rdf2go"
 	ld "github.com/linkeddata/gojsonld"
 	"github.com/parnurzeal/gorequest"
@@ -37,9 +37,10 @@ type PostHookCounter struct {
 }
 
 type PostHookGauge struct {
-	Created   time.Time                   `json:"created"`
-	QueueSize int                         `json:"queueSize"`
-	Counters  map[string]*PostHookCounter `json:"counters"`
+	Created        time.Time                   `json:"created"`
+	QueueSize      int                         `json:"queueSize"`
+	ActiveDatasets int                         `json:"activeDatasets"`
+	Counters       map[string]*PostHookCounter `json:"counters"`
 	sync.Mutex
 }
 
@@ -122,8 +123,10 @@ func (phg *PostHookGauge) Queue(ph *PostHookJob) error {
 }
 
 var gauge PostHookGauge
+var wp *workerpool.WorkerPool
 
 func init() {
+	wp = workerpool.New(100)
 	gauge = PostHookGauge{
 		Created:  time.Now(),
 		Counters: make(map[string]*PostHookCounter),
@@ -211,13 +214,9 @@ func ProcessSpec(spec string) bool {
 	return true
 }
 
-func Submit(wp *w.WorkerPool, ph *PostHookJob) {
+func Submit(ph *PostHookJob) {
 	gauge.Queue(ph)
-	if wp != nil {
-		wp.Submit(func() { ApplyPostHookJob(ph) })
-		return
-	}
-	ApplyPostHookJob(ph)
+	wp.Submit(func() { ApplyPostHookJob(ph) })
 	return
 }
 
