@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package function;
+
+message WebResource {
+    string OrgID = 1;
+    string Spec = 2;
+    string RelativePath = 3;
+    string NormalisedKey = 4;
+    string MD5Hash = 6;
+    string SourcePath = 7;
+    map<string, string> Derivatives = 5;
+}

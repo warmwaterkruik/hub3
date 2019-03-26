@@ -1,0 +1,2 @@
+# don't upload go.mod because it should use the vendor directory
+#go.mod
