@@ -1,0 +1,24 @@
+syntax = "proto3";
+package rdf;
+
+message Resource {
+    string Subject = 1;
+    repeated string Type = 2;
+    map<string, Entry> Objects = 3;
+    repeated string Edges = 4;
+}
+
+message Entry { 
+    string IRI = 1;
+}
+
+message Term {
+    TermType Type = 1;
+    string Value = 2;
+}
+
+enum TermType {
+    TermBlank = 0;
+    TermIRI = 1;
+    TermLiteral = 2;
+}
